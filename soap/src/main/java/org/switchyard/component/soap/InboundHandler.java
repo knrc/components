@@ -93,8 +93,6 @@ public class InboundHandler extends BaseServiceHandler {
      */
     public void start() throws WebServicePublishException {
         ClassLoader origLoader = Thread.currentThread().getContextClassLoader();
-        //XXX: REMOVE THIS SYNCHRONIZED: once threading issues in AS7 WS are fixed
-        synchronized (BaseWebService.class) {
         try {
             _service = _domain.getServiceReference(_config.getServiceName());
             PortName portName = _config.getPort();
@@ -137,17 +135,13 @@ public class InboundHandler extends BaseServiceHandler {
         } finally {
             Thread.currentThread().setContextClassLoader(origLoader);
         }
-        }
     }
 
     /**
      * Stop lifecycle.
      */
     public void stop() {
-        //XXX: REMOVE THIS SYNCHRONIZED: once threading issues in AS7 WS are fixed
-        synchronized (BaseWebService.class) {
-            _endpoint.stop();
-        }
+        _endpoint.stop();
         LOGGER.info("WebService " + _config.getPort() + " stopped.");
     }
 
@@ -174,10 +168,12 @@ public class InboundHandler extends BaseServiceHandler {
         Boolean oneWay = false;
         String firstBodyElement = null;
 
+        if ((soapMessage == null) || (soapMessage.getSOAPPart() == null)) {
+            return handleException(oneWay, new SOAPException("No such operation: " + _wsdlPort.getName() + "->null"));
+        }
         if (LOGGER.isTraceEnabled()) {
             LOGGER.trace("Request:[" + SOAPUtil.soapMessageToString(soapMessage) + "]");
         }
-        
         try {
             firstBodyElement = SOAPUtil.getFirstBodyElement(soapMessage);
             operation = WSDLUtil.getOperation(_wsdlPort, firstBodyElement);
