@@ -33,13 +33,13 @@ import org.apache.camel.Message;
 import org.apache.camel.impl.CompositeRegistry;
 import org.apache.camel.impl.DefaultCamelContext;
 import org.apache.camel.impl.JndiRegistry;
+import org.apache.camel.impl.SimpleRegistry;
 import org.apache.camel.model.FromDefinition;
 import org.apache.camel.model.ProcessorDefinition;
 import org.apache.camel.model.RouteDefinition;
 import org.apache.camel.model.ToDefinition;
 import org.apache.camel.spi.PackageScanClassResolver;
 import org.apache.camel.spi.Registry;
-import org.switchyard.ServiceDomain;
 import org.switchyard.ServiceReference;
 import org.switchyard.component.camel.InboundHandler;
 import org.switchyard.component.camel.OutboundHandler;
@@ -50,6 +50,7 @@ import org.switchyard.component.camel.composer.CamelComposition;
 import org.switchyard.component.camel.config.model.CamelBindingModel;
 import org.switchyard.component.camel.config.model.CamelComponentImplementationModel;
 import org.switchyard.composer.MessageComposer;
+import org.switchyard.config.Configuration;
 import org.switchyard.config.model.composite.BindingModel;
 import org.switchyard.config.model.composite.ComponentModel;
 import org.switchyard.config.model.composite.ComponentReferenceModel;
@@ -65,12 +66,19 @@ import org.switchyard.exception.SwitchYardException;
  *
  */
 public class CamelActivator extends BaseActivator {
+
+    /**
+     * Property added to each Camel Context so that code initialized inside 
+     * Camel can access the SY service domain.
+     */
+    public static final String SERVICE_DOMAIN = "org.switchyard.camel.serviceDomain";
     
     private static final String CAMEL_TYPE = "camel";
     private static final String DIRECT_TYPE = "direct";
     private static final String FILE_TYPE = "file";
     
     private CamelContext _camelContext;
+    private Configuration _environment;
     
     /**
      * Creates a new activator for Camel endpoint types.
@@ -80,21 +88,24 @@ public class CamelActivator extends BaseActivator {
                 CAMEL_TYPE, 
                 DIRECT_TYPE, 
                 FILE_TYPE});
-        
-        start();
     }
 
     @Override
     public ServiceHandler activateBinding(QName serviceName, BindingModel config) {
-        if (config.isServiceBinding()) {
-            return new InboundHandler((CamelBindingModel)config, _camelContext, serviceName);
+        start();
+        CamelBindingModel binding = (CamelBindingModel)config;
+        binding.setEnvironment(_environment);
+
+        if (binding.isServiceBinding()) {
+            return new InboundHandler(binding, _camelContext, serviceName);
         } else {
-            return createOutboundHandler((CamelBindingModel)config, config.getReference().getQName());
+            return createOutboundHandler(binding, binding.getReference().getQName());
         }
     }
     
     @Override
     public ServiceHandler activateService(QName serviceName, ComponentModel config) {
+        start();
         ServiceHandler handler = null;
         
         // process service
@@ -107,14 +118,7 @@ public class CamelActivator extends BaseActivator {
         
         return handler;
     }
-    
-    
-    @Override
-    public void setServiceDomain(ServiceDomain serviceDomain) {
-        super.setServiceDomain(serviceDomain);
-        ServiceReferences.setDomain(serviceDomain);
-    }
-    
+
     /**
      * Starts the camel context for this activator instance.
      */
@@ -126,11 +130,12 @@ public class CamelActivator extends BaseActivator {
      * Stops the camel context for this activator instance.
      */
     public void stop() {
-        try {
-            _camelContext.stop();
-        } catch (Exception ex) {
-            throw new SwitchYardException("CamelActivator failed to stop CamelContext.", ex);
-        }
+        stopCamelContext();
+    }
+    
+    @Override
+    public void destroy() {
+        stop();
     }
 
     @Override
@@ -143,17 +148,30 @@ public class CamelActivator extends BaseActivator {
         // anything to do here?
     }
 
-    private void startCamelContext() {
-        try {
-            _camelContext =  new DefaultCamelContext(getRegistry());
-        
-            final PackageScanClassResolver packageScanClassResolver = getPackageScanClassResolver();
-            if (packageScanClassResolver != null) {
-                _camelContext.setPackageScanClassResolver(packageScanClassResolver);
+    private synchronized void startCamelContext() {
+        if (_camelContext == null) {
+            try {
+                _camelContext =  new DefaultCamelContext(getRegistry());
+            
+                final PackageScanClassResolver packageScanClassResolver = getPackageScanClassResolver();
+                if (packageScanClassResolver != null) {
+                    _camelContext.setPackageScanClassResolver(packageScanClassResolver);
+                }
+                _camelContext.start();
+            } catch (final Exception e) {
+                throw new SwitchYardException(e);
             }
-            _camelContext.start();
-        } catch (final Exception e) {
-            throw new SwitchYardException(e);
+        }
+    }
+
+    private synchronized void stopCamelContext() {
+        if (_camelContext != null) {
+            try {
+                _camelContext.stop();
+                _camelContext = null;
+            } catch (Exception ex) {
+                throw new SwitchYardException("CamelActivator failed to stop CamelContext.", ex);
+            }
         }
     }
     
@@ -179,6 +197,11 @@ public class CamelActivator extends BaseActivator {
         for (Registry registry : registriesLoaders) {
             registries.add(registry);
         }
+        
+        // Simple registry to hold SY props in camel context
+        SimpleRegistry syProps = new SimpleRegistry();
+        syProps.put(SERVICE_DOMAIN, getServiceDomain());
+        registries.add(syProps);
         
         return new CompositeRegistry(registries);
     }
@@ -293,6 +316,14 @@ public class CamelActivator extends BaseActivator {
      */
     public CamelContext getCamelContext() {
         return _camelContext;
+    }
+
+    /**
+     * Set the Environment configuration for the activator.
+     * @param config The global environment configuration.
+     */
+    public void setEnvironment(Configuration config) {
+        _environment = config;
     }
 
 }

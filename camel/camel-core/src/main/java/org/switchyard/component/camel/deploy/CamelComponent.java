@@ -18,6 +18,8 @@
  */
 package org.switchyard.component.camel.deploy;
 
+import org.switchyard.ServiceDomain;
+import org.switchyard.deploy.Activator;
 import org.switchyard.deploy.BaseComponent;
 
 /**
@@ -32,7 +34,16 @@ public class CamelComponent extends BaseComponent {
      */
     public CamelComponent() {
         setName("CamelComponent");
-        setActivator(new CamelActivator());
     }
 
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Activator createActivator(ServiceDomain domain) {
+        CamelActivator activator = new CamelActivator();
+        activator.setServiceDomain(domain);
+        activator.setEnvironment(getConfig());
+        return activator;
+    }
 }
