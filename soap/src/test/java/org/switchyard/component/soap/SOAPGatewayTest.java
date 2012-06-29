@@ -16,7 +16,6 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, 
  * MA  02110-1301, USA.
  */
-
 package org.switchyard.component.soap;
 
 import java.io.ByteArrayOutputStream;
@@ -35,8 +34,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
-import javax.xml.namespace.QName;
-import javax.xml.soap.SOAPMessage;
 import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
@@ -47,21 +44,16 @@ import org.custommonkey.xmlunit.XMLUnit;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.switchyard.Context;
 import org.switchyard.Message;
 import org.switchyard.ServiceDomain;
 import org.switchyard.common.net.SocketAddr;
-import org.switchyard.component.soap.composer.SOAPContextMapper;
 import org.switchyard.component.soap.config.model.SOAPBindingModel;
 import org.switchyard.component.soap.util.SOAPUtil;
-import org.switchyard.composer.ContextMapper;
 import org.switchyard.config.model.ModelPuller;
 import org.switchyard.config.model.composite.CompositeModel;
 import org.switchyard.config.model.composite.CompositeServiceModel;
-import org.switchyard.internal.DefaultContext;
 import org.switchyard.metadata.BaseService;
 import org.switchyard.metadata.InOnlyOperation;
 import org.switchyard.metadata.InOutOperation;
@@ -79,22 +71,28 @@ import org.w3c.dom.Node;
  */
 @RunWith(SwitchYardRunner.class)
 public class SOAPGatewayTest {
+
     private static final int DEFAULT_THREAD_COUNT = 10;
     private static final long DEFAULT_NO_OF_THREADS = 100;
 
     private ServiceDomain _domain;
 
-    @org.switchyard.test.ServiceOperation("webservice-consumer")
-    private Invoker consumerService;
+    @org.switchyard.test.ServiceOperation("webservice-consumer11")
+    private Invoker _consumerService11;
 
-    @org.switchyard.test.ServiceOperation("webservice-consumer-classpath-wsdl")
-    private Invoker consumerCPWsdl;
+    @org.switchyard.test.ServiceOperation("webservice-consumer11-classpath-wsdl")
+    private Invoker _consumerCPWsdl;
+
+    @org.switchyard.test.ServiceOperation("webservice-consumer12")
+    private Invoker _consumerService12;
 
     private SOAPBindingModel _config;
     private static URL _serviceURL;
-    private SOAPGateway _soapInbound;
-    private SOAPGateway _soapOutbound;
-    private SOAPGateway _soapOutbound2;
+    private InboundHandler _soapInbound11;
+    private InboundHandler _soapInbound12;
+    private OutboundHandler _soapOutbound11_1;
+    private OutboundHandler _soapOutbound11_2;
+    private OutboundHandler _soapOutbound12_1;
     private long _noOfThreads = DEFAULT_NO_OF_THREADS;
     
     private static ModelPuller<CompositeModel> _puller;
@@ -155,74 +153,75 @@ public class SOAPGatewayTest {
         CompositeServiceModel compositeService = composite.getServices().get(0);
         _config = (SOAPBindingModel)compositeService.getBindings().get(0);
 
+        // Massive hack for Test Runner. Register both a service and a reference binding.
         _domain.registerService(_config.getServiceName(), new HelloWebServiceInterface(), provider);
+        _domain.registerServiceReference(_config.getServiceName(), new HelloWebServiceInterface());
 
         String host = System.getProperty("org.switchyard.test.soap.host", "localhost");
         String port = System.getProperty("org.switchyard.test.soap.port", "48080");
 
         // Service exposed as WS
-        _soapInbound = new SOAPGateway();
+        _soapInbound11 = new InboundHandler(_config, _domain);
 
         _config.setPublishAsWS(true);
         _config.setSocketAddr(new SocketAddr(host, Integer.parseInt(port)));
-        _soapInbound.init(_config, _domain);
 
-        _soapInbound.start();
+        _soapInbound11.start();
 
         _serviceURL = new URL("http://" + host + ":" + port + "/HelloWebService");
 
         // A WS Consumer as Service
-        _soapOutbound = new SOAPGateway();
         SOAPBindingModel config2 = new SOAPBindingModel();
         config2.setWsdl(_serviceURL.toExternalForm() + "?wsdl");
-        config2.setServiceName(consumerService.getServiceName());
-        _soapOutbound.init(config2, _domain);
-        _soapOutbound.start();
+        config2.setServiceName(_consumerService11.getServiceName());
+        _soapOutbound11_1 = new OutboundHandler(config2);
+        _soapOutbound11_1.start();
+        // Hack for Test Runner. Register a service to test outbound.
+        _domain.registerService(_consumerService11.getServiceName(), new HelloWebServiceInterface(), _soapOutbound11_1);
 
-        _soapOutbound2 = new SOAPGateway();
         SOAPBindingModel config3 = new SOAPBindingModel();
         config3.setWsdl(_config.getWsdl());
-        config3.setServiceName(consumerCPWsdl.getServiceName());
-        _soapOutbound2.init(config3, _domain);
-        _soapOutbound2.start();
+        config3.setServiceName(_consumerCPWsdl.getServiceName());
+        _soapOutbound11_2 = new OutboundHandler(config3);
+        _soapOutbound11_2.start();
+        // Hack for Test Runner. Register a service to test outbound.
+        _domain.registerService(_consumerCPWsdl.getServiceName(), new HelloWebServiceInterface(), _soapOutbound11_2);
+
+        composite = _puller.pull("/HelloSwitchYard1.2.xml", getClass());
+        composite.assertModelValid();
+
+        compositeService = composite.getServices().get(0);
+        SOAPBindingModel _config12 = (SOAPBindingModel)compositeService.getBindings().get(0);
+        _config12.setPublishAsWS(true);
+        _config12.setSocketAddr(new SocketAddr(host, Integer.parseInt(port)));
+
+        // Massive hack for Test Runner. Register both a service and a reference binding.
+        _domain.registerService(_config12.getServiceName(), new HelloWebServiceInterface(), provider);
+        _domain.registerServiceReference(_config12.getServiceName(), new HelloWebServiceInterface());
+
+        // Service exposed as WS
+        _soapInbound12 = new InboundHandler(_config12, _domain);
+        _soapInbound12.start();
+
+        // We cannot use HelloWebServiceXXX, because the context path suffix XXX is ignored by JAXWS
+        URL serviceURL = new URL("http://" + host + ":" + port + "/HelloSOAP12Service");
+
+        SOAPBindingModel config4 = new SOAPBindingModel();
+        config4.setWsdl(serviceURL.toExternalForm() + "?wsdl");
+        config4.setServiceName(_consumerService12.getServiceName());
+        _soapOutbound12_1 = new OutboundHandler(config4);
+        _soapOutbound12_1.start();
+        // Hack for Test Runner. Register a service to test outbound.
+        _domain.registerService(_consumerService12.getServiceName(), new HelloWebServiceInterface(), _soapOutbound12_1);
 
         XMLUnit.setIgnoreWhitespace(true);
     }
     
     @After
     public void tearDown() throws Exception {
-        _soapOutbound.stop();
-        _soapOutbound2.stop();
-        // There is an issue when running under JUnit that at shutdown,
-        // the port isn't completely released. When the next service
-        // is published up on that same port, it goes into a strange state.
-        // _soapInbound.stop();
-        _soapInbound.destroy();
-        _soapOutbound.destroy();
-        _soapOutbound2.destroy();
+        // All are stopped by Test Runner
     }
 
-    @Test
-    public void testContextMapping() throws Exception {
-        QName firstName = new QName("urn:names:1.0", "first");
-        QName lastName = new QName("urn:names:1.0", "last");
-        ContextMapper<SOAPMessage> mapper = new SOAPContextMapper();
-        Context context = new DefaultContext();
-        // test mapFrom
-        SOAPMessage source = SOAPUtil.SOAP_MESSAGE_FACTORY.createMessage();
-        source.getSOAPHeader().addChildElement(firstName).setValue("John");
-        source.getSOAPHeader().addChildElement(lastName).setValue("Doe");
-        mapper.mapFrom(source, context);
-        Assert.assertEquals("John", context.getPropertyValue(firstName.toString()));
-        Assert.assertEquals("Doe", context.getPropertyValue(lastName.toString()));
-        // test mapTo
-        SOAPMessage target = SOAPUtil.SOAP_MESSAGE_FACTORY.createMessage();
-        mapper.mapTo(context, target);
-        Assert.assertEquals("John", ((Element)target.getSOAPHeader().getChildElements(firstName).next()).getTextContent());
-        Assert.assertEquals("Doe", ((Element)target.getSOAPHeader().getChildElements(lastName).next()).getTextContent());
-    }
-
-    @Ignore
     @Test
     public void invokeWithClassPathResource() throws Exception {
         Element input = SOAPUtil.parseAsDom("<test:sayHello xmlns:test=\"urn:switchyard-component-soap:test-ws:1.0\">"
@@ -230,7 +229,7 @@ public class SOAPGatewayTest {
                      + "</test:sayHello>").getDocumentElement();
         String rootCause = null;
         try {
-            consumerCPWsdl.sendInOut(input);
+            _consumerCPWsdl.operation("sayHello").sendInOut(input);
         } catch (InvocationFaultException ife) {
             rootCause = getRootCause(ife);
         }
@@ -240,30 +239,44 @@ public class SOAPGatewayTest {
         Assert.assertEquals("javax.xml.ws.WebServiceException: Unsupported endpoint address: REPLACE_WITH_ACTUAL_URL", rootCause);
     }
 
-
-    @Ignore
     @Test
     public void invokeOneWay() throws Exception {
         Element input = SOAPUtil.parseAsDom("<!--Comment --><test:helloWS xmlns:test=\"urn:switchyard-component-soap:test-ws:1.0\">"
                      + "   <arg0>Hello</arg0>"
                      + "</test:helloWS>").getDocumentElement();
 
-        consumerService.sendInOnly(input);
+        _consumerService11.operation("helloWS").sendInOnly(input);
     }
 
-    @Ignore
     @Test
     public void invokeRequestResponse() throws Exception {
         String input = "<test:sayHello xmlns:test=\"urn:switchyard-component-soap:test-ws:1.0\">"
-                     + "   <arg0>Jimbo</arg0>"
+                     + "   <arg0>Magesh</arg0>"
                      + "</test:sayHello>";
 
         String output = "<test:sayHelloResponse xmlns:test=\"urn:switchyard-component-soap:test-ws:1.0\">"
-                     + "   <return>Hello Jimbo</return>"
+                     + "   <return>Hello Magesh! The soapAction received is \"uri:something:that:needs#tobevalid\"</return>"
                      + "</test:sayHelloResponse>";
 
 
-        Message responseMsg = consumerService.sendInOut(input);
+        Message responseMsg = _consumerService11.operation("sayHello").sendInOut(input);
+
+        String response = toString(responseMsg.getContent(Node.class));
+        XMLAssert.assertXMLEqual(output, response);
+    }
+
+    @Test
+    public void invokeRequestResponseSOAP12() throws Exception {
+        String input = "<test:sayHello xmlns:test=\"urn:switchyard-component-soap:test-ws:1.0\">"
+                     + "   <arg0>Magesh</arg0>"
+                     + "</test:sayHello>";
+
+        String output = "<test:sayHelloResponse xmlns:test=\"urn:switchyard-component-soap:test-ws:1.0\">"
+                     + "   <return>Hello Magesh! The soapAction received is application/soap+xml; charset=utf-8; action=\"uri:soap12:that:needs#tobevalid\"</return>"
+                     + "</test:sayHelloResponse>";
+
+
+        Message responseMsg = _consumerService12.operation("sayHello").sendInOut(input);
 
         String response = toString(responseMsg.getContent(Node.class));
         XMLAssert.assertXMLEqual(output, response);
@@ -280,7 +293,6 @@ public class SOAPGatewayTest {
         return sw.toString();
     }
 
-    @Ignore
     @Test
     public void invokeRequestResponseFault() throws Exception {
         String input = "<test:sayHello xmlns:test=\"urn:switchyard-component-soap:test-ws:1.0\">"
@@ -296,12 +308,11 @@ public class SOAPGatewayTest {
                         + "   </detail>"
                         + "</SOAP-ENV:Fault>";
 
-        Message responseMsg = consumerService.sendInOut(input);
+        Message responseMsg = _consumerService11.operation("sayHello").sendInOut(input);
         String response = toString(responseMsg.getContent(Node.class));
         XMLAssert.assertXMLEqual(output, response);
     }
 
-    @Ignore
     @Test
     public void invokeRequestResponseCustomFault() throws Exception {
         String faultString =  "<CustomFaultMessage>"
@@ -315,19 +326,18 @@ public class SOAPGatewayTest {
                        + "</test:sayHello>";
 
         String output = "<SOAP-ENV:Fault xmlns:SOAP-ENV=\"http://schemas.xmlsoap.org/soap/envelope/\">"
-                        +    "<faultcode>SOAP-ENV:Server</faultcode>"
+                        +    "<faultcode xmlns:ns0=\"http://www.w3.org/2003/05/soap-envelope\">ns0:Fault</faultcode>"
                         +    "<faultstring>Send failed</faultstring>"
                         +    "<detail>"
                         +    faultString
                         +    "</detail>"
                         + "</SOAP-ENV:Fault>";
 
-        Message responseMsg = consumerService.sendInOut(input);
+        Message responseMsg = _consumerService11.operation("sayHello").sendInOut(input);
         String response = toString(responseMsg.getContent(Node.class));
         XMLAssert.assertXMLEqual(output, response);
     }
 
-    @Ignore
     @Test
     public void invokeMultiThreaded() throws Exception {
         String output = null;
@@ -344,11 +354,12 @@ public class SOAPGatewayTest {
 
         for (Future<String> future : futures) {
             response = future.get();
-            output =  "<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\"><soap:Body>"
+            output =  "<SOAP-ENV:Envelope xmlns:SOAP-ENV=\"http://schemas.xmlsoap.org/soap/envelope/\">"
+                     + "<SOAP-ENV:Body>"
                      + "   <test:sayHelloResponse xmlns:test=\"urn:switchyard-component-soap:test-ws:1.0\">"
-                     + "      <return>Hello Thread " + i + "</return>"
+                     + "      <return>Hello Thread " + i + "! The soapAction received is </return>"
                      + "   </test:sayHelloResponse>"
-                     + "</soap:Body></soap:Envelope>";
+                     + "</SOAP-ENV:Body></SOAP-ENV:Envelope>";
             XMLAssert.assertXMLEqual(output, response);
             i++;
         }

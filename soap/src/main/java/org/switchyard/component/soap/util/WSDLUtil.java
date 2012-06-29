@@ -30,6 +30,7 @@ import java.net.URL;
 import java.util.Iterator;
 import java.util.List;
 
+import javax.wsdl.BindingOperation;
 import javax.wsdl.Definition;
 import javax.wsdl.Operation;
 import javax.wsdl.OperationType;
@@ -37,11 +38,15 @@ import javax.wsdl.Part;
 import javax.wsdl.Port;
 import javax.wsdl.Service;
 import javax.wsdl.WSDLException;
+import javax.wsdl.extensions.ExtensibilityElement;
+import javax.wsdl.extensions.soap.SOAPOperation;
+import javax.wsdl.extensions.soap12.SOAP12Operation;
 import javax.wsdl.factory.WSDLFactory;
 import javax.wsdl.xml.WSDLReader;
 import javax.xml.XMLConstants;
 import javax.xml.namespace.QName;
 import javax.xml.transform.stream.StreamSource;
+import javax.xml.ws.soap.SOAPBinding;
 
 import org.apache.log4j.Logger;
 import org.switchyard.ExchangePattern;
@@ -61,10 +66,14 @@ public final class WSDLUtil {
     private static final Logger LOGGER = Logger.getLogger(WSDLUtil.class);
 
     /**
-     * SOAP Fault type QName.
+     * SOAP 1.1 QName namespace.
      */
-    public static final QName SOAP_FAULT_MESSAGE_TYPE = 
-        QName.valueOf("{http://schemas.xmlsoap.org/soap/envelope/}Fault");
+    public static final String WSDL_SOAP11_URI = "http://schemas.xmlsoap.org/wsdl/soap/";
+
+    /**
+     * SOAP 1.2 QName namespace.
+     */
+    public static final String WSDL_SOAP12_URI = "http://schemas.xmlsoap.org/wsdl/soap12/";
 
     private WSDLUtil() {
     }
@@ -217,12 +226,12 @@ public final class WSDLUtil {
     }
 
     /**
-     * Get the SOAP {@link Operation} instance for the specified SOAP operation name.
+     * Get the SOAP {@link Operation} instance for the specified message element.
      * @param port The WSDL port.
      * @param elementName The SOAP Body element name.
      * @return The Operation instance, or null if the operation was not found on the port.
      */
-    public static Operation getOperation(Port port, String elementName) {
+    public static Operation getOperationByElement(Port port, String elementName) {
         
         List<Operation> operations = port.getBinding().getPortType().getOperations();
         
@@ -233,6 +242,43 @@ public final class WSDLUtil {
             }
         }
         return null;
+    }
+    
+    /**
+     * Get the {@link Operation} instance for the specified SOAP operation name.
+     * @param port The WSDL port.
+     * @param operationName The SOAP Body element name.
+     * @return The Operation instance, or null if the operation was not found on the port.
+     */
+    public static Operation getOperationByName(Port port, String operationName) {
+        Operation operation = null;
+        List<Operation> operationList = port.getBinding().getPortType().getOperations();
+        
+        for (Operation op : operationList) {
+            if (op.getName().equals(operationName)) {
+                operation = op;
+                break;
+            }
+        }
+        return operation;
+    }
+
+    /**
+     * Get the SOAP Binding Id for the specified {@link Port}.
+     *
+     * @param port The WSDL port.
+     * @return The SOAPBinding Id found on the port.
+     */
+    public static String getBindingId(Port port) {
+        String bindingId = SOAPBinding.SOAP11HTTP_BINDING;
+        List<ExtensibilityElement> extElements = port.getExtensibilityElements();
+        for (ExtensibilityElement extElement : extElements) {
+            if (extElement.getElementType().getNamespaceURI().equals(WSDL_SOAP12_URI)) {
+                bindingId = SOAPBinding.SOAP12HTTP_BINDING;
+            }
+            break;
+        }
+        return bindingId;
     }
 
     /**
@@ -245,7 +291,7 @@ public final class WSDLUtil {
     public static boolean isOneWay(final Port port, final String elementName) {
         // Overloaded methods not supported
         // Encrypted messages will be treated as request-response as it cannot be decrypted
-        Operation operation = getOperation(port, elementName);
+        Operation operation = getOperationByElement(port, elementName);
         return isOneWay(operation);
     }
     
@@ -262,6 +308,65 @@ public final class WSDLUtil {
        }
        return isOneWay;
    }
+
+   /**
+     * Get the SOAP {@link BindingOperation} instance for the specified SOAP operation name.
+     * @param port The WSDL port.
+     * @param elementName The SOAP Body element name.
+     * @return The BindingOperation instance, or null if the operation was not found on the port.
+     */
+    public static BindingOperation getBindingOperation(Port port, String elementName) {
+        Operation operation = getOperationByElement(port, elementName);
+        if (operation != null) {
+            List<BindingOperation> bindingOperations = port.getBinding().getBindingOperations();
+            for (BindingOperation bindingOperation : bindingOperations) {
+                if (bindingOperation.getName().equals(operation.getName())) {
+                    return bindingOperation;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Get the soapAction value for a given operation.
+     *
+     * @param port The WSDL service port.
+     * @param elementName The SOAP Body element name.
+     * @return the soapAction value if it exists.
+     */
+    public static String getSoapAction(final Port port, final String elementName) {
+        // Overloaded methods not supported
+        BindingOperation operation = getBindingOperation(port, elementName);
+        return getSoapAction(operation);
+    }
+
+    /**
+     * Get the soapAction value for a given operation.
+     *
+     * @param operation The WSDL BindingOperation.
+     * @return the soapAction value if it exists.
+     */
+    public static String getSoapAction(final BindingOperation operation) {
+        String soapActionUri = "";
+        if (operation != null) {
+            List<ExtensibilityElement> extElements = operation.getExtensibilityElements();
+            for (ExtensibilityElement extElement : extElements) {
+                if (extElement instanceof SOAPOperation) {
+                    soapActionUri = ((SOAPOperation) extElement).getSoapActionURI();
+                    break;
+                } else if (extElement instanceof SOAP12Operation) {
+                    SOAP12Operation soapOperation = ((SOAP12Operation) extElement);
+                    Boolean soapActionRequired = soapOperation.getSoapActionRequired();
+                    if ((soapActionRequired == null) || soapActionRequired) {
+                        soapActionUri = soapOperation.getSoapActionURI();
+                    }
+                    break;
+                }
+            }
+        }
+        return soapActionUri;
+    }
 
     /**
      * Get the methods Input message's name.
@@ -289,7 +394,7 @@ public final class WSDLUtil {
         QName messageName = null;
         // Overloaded methods not supported
         // Encrypted messages will be treated as request-response as it cannot be decrypted
-        Operation operation = getOperation(port, operationName);
+        Operation operation = getOperationByElement(port, operationName);
         if (operation != null) {
             messageName = operation.getInput().getMessage().getQName();
         }

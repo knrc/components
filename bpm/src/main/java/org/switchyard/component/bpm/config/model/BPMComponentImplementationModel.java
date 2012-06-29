@@ -72,6 +72,34 @@ public interface BPMComponentImplementationModel extends ComponentImplementation
     public BPMComponentImplementationModel setProcessId(String processId);
 
     /**
+     * Gets the "persistent" attribute.
+     * @return the "peristent" attribute
+     */
+    public boolean isPersistent();
+
+    /**
+     * Gets the "sessionId" attribute.
+     *
+     * @return the "sessionId" attribute
+     */
+    public Integer getSessionId();
+
+    /**
+     * Sets the "sessionId" attribute.
+     *
+     * @param sessionId the "sessionId" attribute
+     * @return this instance (useful for chaining)
+     */
+    public BPMComponentImplementationModel setSessionId(Integer sessionId);
+
+    /**
+     * Sets the "persistent" attribute.
+     * @param persistent the "persistent" attribute
+     * @return this instance (useful for chaining)
+     */
+    public BPMComponentImplementationModel setPersistent(boolean persistent);
+
+    /**
      * Gets the "messageContentInName" attribute.
      *
      * @return the "messageContentInName" attribute
@@ -126,5 +154,31 @@ public interface BPMComponentImplementationModel extends ComponentImplementation
      * @return this BPMComponentImplementationModel (useful for chaining)
      */
     public BPMComponentImplementationModel addTaskHandler(TaskHandlerModel taskHandler);
+
+    /**
+     * Gets the child parameters model.
+     * @return the child parameters model
+     */
+    public ParametersModel getParameters();
+
+    /**
+     * Sets the child parameters model.
+     * @param parameters the child parameters model
+     * @return this BPMComponentImplementationModel (useful for chaining)
+     */
+    public BPMComponentImplementationModel setParameters(ParametersModel parameters);
+
+    /**
+     * Gets the child results model.
+     * @return the child results model
+     */
+    public ResultsModel getResults();
+
+    /**
+     * Sets the child results model.
+     * @param results the child results model
+     * @return this BPMComponentImplementationModel (useful for chaining)
+     */
+    public BPMComponentImplementationModel setResults(ResultsModel results);
 
 }

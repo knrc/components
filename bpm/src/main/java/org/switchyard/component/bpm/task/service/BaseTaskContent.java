@@ -18,77 +18,25 @@
  */
 package org.switchyard.component.bpm.task.service;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.io.ObjectStreamClass;
 import java.util.Map;
 
-import org.switchyard.common.type.Classes;
-import org.switchyard.exception.SwitchYardException;
 
 /**
  * Base Content functionality.
  *
  * @author David Ward &lt;<a href="mailto:dward@jboss.org">dward@jboss.org</a>&gt; (C) 2011 Red Hat Inc.
  */
-public abstract class BaseTaskContent implements TaskContent {
+@SuppressWarnings("serial")
+public class BaseTaskContent implements TaskContent {
 
-    private Long _id;
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public Long getId() {
-        return _id;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public TaskContent setId(Long id) {
-        _id = id;
-        return this;
-    }
+    private Object _object;
 
     /**
      * {@inheritDoc}
      */
     @Override
     public Object getObject() {
-        Object object = null;
-        byte[] bytes = getBytes();
-        if (bytes != null && bytes.length > 0) {
-            ByteArrayInputStream bais = new ByteArrayInputStream(bytes);
-            ObjectInputStream ois = null;
-            try {
-                ois = new ObjectInputStream(bais) {
-                    @Override
-                    protected Class<?> resolveClass(ObjectStreamClass desc) throws IOException, ClassNotFoundException {
-                        Class<?> clazz = Classes.forName(desc.getName(), getClass());
-                        return clazz != null ? clazz : super.resolveClass(desc);
-                    }
-                };
-                object = ois.readObject();
-            } catch (IOException ioe) {
-                throw new SwitchYardException(ioe);
-            } catch (ClassNotFoundException cnfe) {
-                throw new SwitchYardException(cnfe);
-            } finally {
-                if (ois != null) {
-                    try {
-                        ois.close();
-                    } catch (IOException ioe) {
-                        throw new SwitchYardException(ioe);
-                    }
-                }
-            }
-        }
-        return object;
+        return _object;
     }
 
     /**
@@ -97,36 +45,6 @@ public abstract class BaseTaskContent implements TaskContent {
     @Override
     public <T> T getObject(Class<T> clazz) {
         return clazz.cast(getObject());
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public TaskContent setObject(Object object) {
-        byte[] bytes = null;
-        if (object != null) {
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            ObjectOutputStream oos = null;
-            try {
-                oos = new ObjectOutputStream(baos);
-                oos.writeObject(object);
-                oos.flush();
-            } catch (IOException ioe) {
-                throw new SwitchYardException(ioe);
-            } finally {
-                if (oos != null) {
-                    try {
-                        oos.close();
-                    } catch (IOException ioe) {
-                        throw new SwitchYardException(ioe);
-                    }
-                }
-            }
-            bytes = baos.toByteArray();
-        }
-        setBytes(bytes);
-        return this;
     }
 
     /**
@@ -142,8 +60,8 @@ public abstract class BaseTaskContent implements TaskContent {
      * {@inheritDoc}
      */
     @Override
-    public TaskContent setMap(Map<String, Object> map) {
-        setObject(map);
+    public TaskContent setObject(Object object) {
+        _object = object;
         return this;
     }
 

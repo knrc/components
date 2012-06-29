@@ -31,12 +31,12 @@
     <packaging>jar</packaging>
     <name>SwitchYard: Rules Common Component Library</name>
     <description>The SwitchYard Rules Common Component Library.</description>
-    <url>http://switchyard/</url>
+    <url>http://switchyard.org</url>
 
     <parent>
         <groupId>org.switchyard.components</groupId>
         <artifactId>switchyard-component-common</artifactId>
-        <version>0.4.0.Final</version>
+        <version>0.5.0.Beta1</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
@@ -45,10 +45,6 @@
         <dependency>
             <groupId>org.antlr</groupId>
             <artifactId>antlr-runtime</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.drools</groupId>
-            <artifactId>knowledge-api</artifactId>
         </dependency>
         <dependency>
             <groupId>org.drools</groupId>
@@ -61,6 +57,14 @@
         <dependency>
             <groupId>org.drools</groupId>
             <artifactId>drools-persistence-jpa</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.drools</groupId>
+            <artifactId>knowledge-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.drools</groupId>
+            <artifactId>knowledge-internal-api</artifactId>
         </dependency>
         <dependency>
             <groupId>org.eclipse.jdt.core.compiler</groupId>

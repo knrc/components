@@ -23,13 +23,17 @@ package org.switchyard.component.camel.config.model.v1;
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
 import javax.xml.bind.Unmarshaller;
+import javax.xml.namespace.QName;
 
 import org.apache.camel.model.Constants;
 import org.apache.camel.model.RouteDefinition;
+import org.switchyard.common.type.Classes;
 import org.switchyard.component.camel.SwitchYardRouteDefinition;
 import org.switchyard.component.camel.config.model.CamelComponentImplementationModel;
 import org.switchyard.config.Configuration;
+import org.switchyard.config.model.BaseModel;
 import org.switchyard.config.model.Descriptor;
+import org.switchyard.config.model.Model;
 import org.switchyard.config.model.composite.v1.V1ComponentImplementationModel;
 import org.switchyard.exception.SwitchYardException;
 
@@ -43,6 +47,12 @@ public class V1CamelImplementationModel extends V1ComponentImplementationModel i
     
     // The class attribute for Java DSL routes
     private static final String CLASS = "class";
+
+    // The path attribute for XML DSL routes
+    private static final String PATH = "path";
+
+    private static final QName ROUTE_ELEMENT = 
+            new QName("http://camel.apache.org/schema/spring", "route");
     
     private static JAXBContext jaxbContext = createJAXBInstance();
     
@@ -66,22 +76,38 @@ public class V1CamelImplementationModel extends V1ComponentImplementationModel i
 
     @Override
     public RouteDefinition getRoute() {
-        final Configuration routeConfig = getModelConfiguration().getFirstChild(ROUTE);
-        if (routeConfig == null) {
-            return null;
-        }
-        RouteDefinition route;
+        RouteDefinition route = null;
+        Configuration routeConfig = getModelConfiguration().getFirstChild(ROUTE);
         try {
             Unmarshaller unmarshaller = jaxbContext.createUnmarshaller();
-            route = (RouteDefinition) unmarshaller.unmarshal(routeConfig.getSource());
-        } catch (JAXBException e) {
-            throw new SwitchYardException(e);
+            if (routeConfig != null) {
+                route = (RouteDefinition) unmarshaller.unmarshal(routeConfig.getSource());
+            } else if (getXMLPath() != null) {
+                route = (RouteDefinition) unmarshaller.unmarshal(Classes.getResource(getXMLPath()));
+            }
+        } catch (Exception e) {
+            throw new SwitchYardException("Failed to load Camel XML route definition.", e);
         }
+        
         String namespace = getComponent().getTargetNamespace();
         if (route != null && namespace != null) {
             SwitchYardRouteDefinition.addNamespaceParameter(route, namespace);
         }
         return route;
+    }
+    
+    /**
+     * Add an empty Camel route definition to the implementation.
+     * @return the JAXB object model for the empty Camel route.
+     */
+    public RouteDefinition addRoute() {
+        if (getModelConfiguration().getFirstChild(ROUTE) != null) {
+            throw new IllegalStateException(ROUTE + " element already exists in implementation!");
+        }
+        
+        Model routeModel = new BaseModel(ROUTE_ELEMENT) {};
+        addChildModel(routeModel);
+        return getRoute();
     }
     
     private static JAXBContext createJAXBInstance() {
@@ -107,6 +133,25 @@ public class V1CamelImplementationModel extends V1ComponentImplementationModel i
             setChildModel(model);
         } else {
             classConfig.setAttribute(CLASS, className);
+        }
+        return this;
+    }
+
+    @Override
+    public String getXMLPath() {
+        Configuration classConfig = getModelConfiguration().getFirstChild(XML);
+        return classConfig != null ? classConfig.getAttribute(PATH) : null;
+    }
+
+    @Override
+    public CamelComponentImplementationModel setXMLPath(String path) {
+        Configuration pathConfig = getModelConfiguration().getFirstChild(XML);
+        if (pathConfig == null) {
+            NameValueModel model = new NameValueModel(XML);
+            model.getModelConfiguration().setAttribute(PATH, path);
+            setChildModel(model);
+        } else {
+            pathConfig.setAttribute(PATH, path);
         }
         return this;
     }

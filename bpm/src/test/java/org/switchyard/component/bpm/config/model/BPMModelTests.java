@@ -37,6 +37,10 @@ import org.switchyard.common.io.pull.StringPuller;
 import org.switchyard.common.io.resource.ResourceType;
 import org.switchyard.common.type.Classes;
 import org.switchyard.component.bpm.task.work.SwitchYardServiceTaskHandler;
+import org.switchyard.component.common.rules.config.model.MappingModel;
+import org.switchyard.component.common.rules.expression.Expression;
+import org.switchyard.component.common.rules.expression.ExpressionFactory;
+import org.switchyard.component.common.rules.expression.ExpressionType;
 import org.switchyard.config.Configuration;
 import org.switchyard.config.model.ModelPuller;
 import org.switchyard.config.model.Scanner;
@@ -76,6 +80,8 @@ public class BPMModelTests {
         Assert.assertEquals("foobar.bpmn", bci.getProcessDefinition().getLocation());
         Assert.assertSame(ResourceType.valueOf("BPMN2"), bci.getProcessDefinition().getType());
         Assert.assertEquals("foobar", bci.getProcessId());
+        Assert.assertTrue(bci.isPersistent());
+        Assert.assertEquals(Integer.valueOf(3), bci.getSessionId());
         Configuration config = bci.getModelConfiguration();
         Assert.assertEquals("implementation.bpm", config.getName());
         QName qname = config.getQName();
@@ -87,6 +93,16 @@ public class BPMModelTests {
         TaskHandlerModel th = bci.getTaskHandlers().iterator().next();
         Assert.assertEquals(SwitchYardServiceTaskHandler.class, th.getClazz());
         Assert.assertNull(th.getName());
+        MappingModel pmm = bci.getParameters().getMappings().iterator().next();
+        Assert.assertEquals("payload", pmm.getVariable());
+        Expression pexpr = ExpressionFactory.instance().create(pmm);
+        Assert.assertEquals("message.content", pexpr.getExpression());
+        Assert.assertEquals(ExpressionType.MVEL, pexpr.getType());
+        MappingModel rmm = bci.getResults().getMappings().iterator().next();
+        Assert.assertNull(rmm.getVariable());
+        Expression rexpr = ExpressionFactory.instance().create(rmm);
+        Assert.assertEquals("message.content = payload;", rexpr.getExpression());
+        Assert.assertEquals(ExpressionType.MVEL, rexpr.getType());
     }
 
     @Test

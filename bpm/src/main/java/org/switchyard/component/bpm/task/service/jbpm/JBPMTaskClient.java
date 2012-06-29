@@ -24,8 +24,9 @@ import java.util.Locale;
 
 import org.apache.log4j.Logger;
 import org.drools.SystemEventListenerFactory;
-import org.jbpm.task.AccessType;
+import org.jbpm.task.Content;
 import org.jbpm.task.query.TaskSummary;
+import org.jbpm.task.service.ContentData;
 import org.jbpm.task.service.TaskClient;
 import org.jbpm.task.service.mina.MinaTaskClientConnector;
 import org.jbpm.task.service.mina.MinaTaskClientHandler;
@@ -33,6 +34,8 @@ import org.jbpm.task.service.responsehandlers.BlockingGetContentResponseHandler;
 import org.jbpm.task.service.responsehandlers.BlockingGetTaskResponseHandler;
 import org.jbpm.task.service.responsehandlers.BlockingTaskOperationResponseHandler;
 import org.jbpm.task.service.responsehandlers.BlockingTaskSummaryResponseHandler;
+import org.jbpm.task.utils.ContentMarshallerContext;
+import org.jbpm.task.utils.ContentMarshallerHelper;
 import org.switchyard.component.bpm.task.service.BaseTaskClient;
 import org.switchyard.component.bpm.task.service.Task;
 import org.switchyard.component.bpm.task.service.TaskContent;
@@ -104,12 +107,12 @@ public class JBPMTaskClient extends BaseTaskClient {
         BlockingGetContentResponseHandler bgcrh = new BlockingGetContentResponseHandler();
         _wrapped.getContent(taskContentId.longValue(), bgcrh);
         bgcrh.waitTillDone(10000);
-        org.jbpm.task.Content content = bgcrh.getContent();
+        Content content = bgcrh.getContent();
         if (content != null) {
             if (LOGGER.isDebugEnabled()) {
                 LOGGER.debug(String.format("Found content with id %s.", content.getId()));
             }
-            return new JBPMTaskContent(content); 
+            return new JBPMTaskContent(content);
         }
         return null;
     }
@@ -169,16 +172,12 @@ public class JBPMTaskClient extends BaseTaskClient {
     @Override
     public void complete(Long taskId, String userId, TaskContent content) {
         BlockingTaskOperationResponseHandler btorh = new BlockingTaskOperationResponseHandler();
-        org.jbpm.task.service.ContentData contentData;
-        if (content instanceof JBPMTaskContent) {
-            contentData = ((JBPMTaskContent)content).getWrapped();
-        } else if (content != null) {
-            contentData = new org.jbpm.task.service.ContentData();
-            contentData.setType(content.getType());
-            contentData.setContent(content.getBytes());
-            contentData.setAccessType(AccessType.Inline);
-        } else {
-            contentData = null;
+        ContentData contentData = null;
+        if (content != null) {
+            Object object = content.getObject();
+            if (object != null) {
+                contentData = ContentMarshallerHelper.marshal(object, new ContentMarshallerContext(), null);
+            }
         }
         _wrapped.complete(taskId.longValue(), userId, contentData, btorh);
         btorh.waitTillDone(10000);

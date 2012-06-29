@@ -31,16 +31,17 @@
     <packaging>pom</packaging>
     <name>SwitchYard: Common Component Libraries</name>
     <description>The SwitchYard Common Component Libraries.</description>
-    <url>http://switchyard/</url>
+    <url>http://switchyard.org</url>
 
     <parent>
         <groupId>org.switchyard.components</groupId>
         <artifactId>switchyard-components-parent</artifactId>
-        <version>0.4.0.Final</version>
+        <version>0.5.0.Beta1</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
     <modules>
+        <module>composer</module>
         <module>rules</module>
     </modules>
 

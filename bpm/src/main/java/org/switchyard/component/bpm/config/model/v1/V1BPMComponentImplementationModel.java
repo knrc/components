@@ -25,9 +25,12 @@ import java.util.List;
 import org.switchyard.common.io.resource.Resource;
 import org.switchyard.common.io.resource.ResourceType;
 import org.switchyard.common.io.resource.SimpleResource;
+import org.switchyard.common.lang.Strings;
 import org.switchyard.component.bpm.ProcessConstants;
 import org.switchyard.component.bpm.config.model.BPMComponentImplementationModel;
+import org.switchyard.component.bpm.config.model.ParametersModel;
 import org.switchyard.component.bpm.config.model.ProcessActionModel;
+import org.switchyard.component.bpm.config.model.ResultsModel;
 import org.switchyard.component.bpm.config.model.TaskHandlerModel;
 import org.switchyard.component.common.rules.config.model.AuditModel;
 import org.switchyard.component.common.rules.config.model.v1.V1ComponentImplementationModel;
@@ -44,13 +47,15 @@ public class V1BPMComponentImplementationModel extends V1ComponentImplementation
 
     private List<ProcessActionModel> _processActions = new ArrayList<ProcessActionModel>();
     private List<TaskHandlerModel> _taskHandlers = new ArrayList<TaskHandlerModel>();
+    private ParametersModel _parameters = null;
+    private ResultsModel _results = null;
 
     /**
      * Default constructor for application use.
      */
     public V1BPMComponentImplementationModel() {
         super(BPM, DEFAULT_NAMESPACE);
-        setModelChildrenOrder(ProcessActionModel.ACTION, AuditModel.AUDIT, TaskHandlerModel.TASK_HANDLER, ResourceModel.RESOURCE);
+        setModelChildrenOrder(ProcessActionModel.ACTION, AuditModel.AUDIT, TaskHandlerModel.TASK_HANDLER, ResourceModel.RESOURCE, ParametersModel.PARAMETERS, ResultsModel.RESULTS);
     }
 
     /**
@@ -73,7 +78,7 @@ public class V1BPMComponentImplementationModel extends V1ComponentImplementation
                 _taskHandlers.add(taskHandler);
             }
         }
-        setModelChildrenOrder(ProcessActionModel.ACTION, AuditModel.AUDIT, TaskHandlerModel.TASK_HANDLER, ResourceModel.RESOURCE);
+        setModelChildrenOrder(ProcessActionModel.ACTION, AuditModel.AUDIT, TaskHandlerModel.TASK_HANDLER, ResourceModel.RESOURCE, ParametersModel.PARAMETERS, ResultsModel.RESULTS);
     }
 
     /**
@@ -114,6 +119,45 @@ public class V1BPMComponentImplementationModel extends V1ComponentImplementation
     @Override
     public BPMComponentImplementationModel setProcessId(String processId) {
         setModelAttribute(ProcessConstants.PROCESS_ID, processId);
+        return this;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public boolean isPersistent() {
+        String persistent = Strings.trimToNull(getModelAttribute(ProcessConstants.PERSISTENT));
+        if (persistent != null) {
+            return Boolean.valueOf(persistent).booleanValue();
+        }
+        return false;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public BPMComponentImplementationModel setPersistent(boolean persistent) {
+        setModelAttribute(ProcessConstants.PERSISTENT, String.valueOf(persistent));
+        return this;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Integer getSessionId() {
+        String sessionId = getModelAttribute(ProcessConstants.SESSION_ID);
+        return sessionId != null ? Integer.valueOf(sessionId) : null;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public BPMComponentImplementationModel setSessionId(Integer sessionId) {
+        setModelAttribute(ProcessConstants.SESSION_ID, sessionId != null ? sessionId.toString() : null);
         return this;
     }
 
@@ -184,6 +228,48 @@ public class V1BPMComponentImplementationModel extends V1ComponentImplementation
     public BPMComponentImplementationModel addTaskHandler(TaskHandlerModel taskHandler) {
         addChildModel(taskHandler);
         _taskHandlers.add(taskHandler);
+        return this;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public ParametersModel getParameters() {
+        if (_parameters == null) {
+            _parameters = (ParametersModel)getFirstChildModel(ParametersModel.PARAMETERS);
+        }
+        return _parameters;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public BPMComponentImplementationModel setParameters(ParametersModel parameters) {
+        setChildModel(parameters);
+        _parameters = parameters;
+        return this;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public ResultsModel getResults() {
+        if (_results == null) {
+            _results = (ResultsModel)getFirstChildModel(ResultsModel.RESULTS);
+        }
+        return _results;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public BPMComponentImplementationModel setResults(ResultsModel results) {
+        setChildModel(results);
+        _results = results;
         return this;
     }
 

@@ -27,6 +27,7 @@ import java.lang.annotation.Target;
 
 import org.switchyard.component.bpm.task.work.BaseTaskHandler;
 import org.switchyard.component.bpm.task.work.TaskHandler;
+import org.switchyard.component.common.rules.Mapping;
 
 /**
  * Process annotation.
@@ -64,6 +65,16 @@ public @interface Process {
     public String id() default "";
 
     /**
+     * Specified persistent flag.
+     */
+    public boolean persistent() default false;
+
+    /**
+     * Specified sessionId.
+     */
+    public int sessionId() default -1;
+
+    /**
      * Specified agent flag.
      */
     public boolean agent() default false;
@@ -87,6 +98,16 @@ public @interface Process {
      * Specified task handlers for the process.
      */
     public Class<? extends TaskHandler>[] taskHandlers() default UndefinedTaskHandler.class;
+
+    /**
+     * Parameter Mappings for the rules.
+     */
+    public Mapping[] parameters() default {};
+
+    /**
+     * Result Mappings for the rules.
+     */
+    public Mapping[] results() default {};
 
     /** An undefined process interface. */
     public static interface UndefinedProcessInterface {};

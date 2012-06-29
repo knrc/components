@@ -61,7 +61,7 @@ public class SOAPBindingModel extends V1BindingModel {
     private SocketAddr _socketAddr;
     private String _contextPath;
     private Boolean _publishAsWS = false;
-
+    
     private Configuration _environment = Configurations.emptyConfig();
     /**
      * Constructor.
@@ -79,6 +79,23 @@ public class SOAPBindingModel extends V1BindingModel {
      */
     public SOAPBindingModel(Configuration config, Descriptor desc) {
         super(config, desc);
+        setModelChildrenOrder(WSDL, PORT, SOCKET_ADDRESS);
+    }
+
+    /**
+     * Gets the SOAPContextMapperModel.
+     * @return the SOAPContextMapperModel
+     */
+    public SOAPContextMapperModel getSOAPContextMapper() {
+        return (SOAPContextMapperModel)getContextMapper();
+    }
+    
+    /**
+     * Gets the SOAPMessageComposerModel.
+     * @return the SOAPMessageComposerModel
+     */
+    public SOAPMessageComposerModel getSOAPMessageComposer() {
+        return (SOAPMessageComposerModel)getMessageComposer();
     }
 
     /**

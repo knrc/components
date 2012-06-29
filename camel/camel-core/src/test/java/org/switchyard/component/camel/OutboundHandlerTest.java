@@ -24,7 +24,6 @@ package org.switchyard.component.camel;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.is;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -47,7 +46,7 @@ import org.switchyard.ServiceDomain;
 import org.switchyard.ServiceReference;
 import org.switchyard.component.camel.composer.CamelComposition;
 import org.switchyard.component.camel.config.model.CamelBindingModel;
-import org.switchyard.composer.MessageComposer;
+import org.switchyard.component.common.composer.MessageComposer;
 import org.switchyard.metadata.InOnlyService;
 import org.switchyard.metadata.ServiceInterface;
 import org.switchyard.test.Invoker;

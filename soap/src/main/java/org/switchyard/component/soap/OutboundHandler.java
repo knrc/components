@@ -26,6 +26,7 @@ import javax.wsdl.Port;
 import javax.wsdl.WSDLException;
 import javax.xml.soap.SOAPException;
 import javax.xml.soap.SOAPMessage;
+import javax.xml.ws.BindingProvider;
 import javax.xml.ws.Dispatch;
 import javax.xml.ws.Service;
 import javax.xml.ws.soap.AddressingFeature;
@@ -35,11 +36,11 @@ import org.apache.log4j.Logger;
 import org.switchyard.Exchange;
 import org.switchyard.HandlerException;
 import org.switchyard.Message;
+import org.switchyard.component.common.composer.MessageComposer;
 import org.switchyard.component.soap.composer.SOAPComposition;
 import org.switchyard.component.soap.config.model.SOAPBindingModel;
 import org.switchyard.component.soap.util.SOAPUtil;
 import org.switchyard.component.soap.util.WSDLUtil;
-import org.switchyard.composer.MessageComposer;
 import org.switchyard.deploy.BaseServiceHandler;
 
 /**
@@ -52,10 +53,11 @@ public class OutboundHandler extends BaseServiceHandler {
     private static final Logger LOGGER = Logger.getLogger(OutboundHandler.class);
 
     private final SOAPBindingModel _config;
-    private final MessageComposer<SOAPMessage> _messageComposer;
-
+    
+    private MessageComposer<SOAPMessage> _messageComposer;
     private Dispatch<SOAPMessage> _dispatcher;
-    private Port _port;
+    private Port _wsdlPort;
+    private String _bindingId;
 
     /**
      * Constructor.
@@ -63,7 +65,6 @@ public class OutboundHandler extends BaseServiceHandler {
      */
     public OutboundHandler(final SOAPBindingModel config) {
         _config = config;
-        _messageComposer = SOAPComposition.getMessageComposer(config);
     }
 
     /**
@@ -76,10 +77,13 @@ public class OutboundHandler extends BaseServiceHandler {
             try {
                 PortName portName = _config.getPort();
                 javax.wsdl.Service wsdlService = WSDLUtil.getService(_config.getWsdl(), portName);
-                _port = WSDLUtil.getPort(wsdlService, portName);
+                _wsdlPort = WSDLUtil.getPort(wsdlService, portName);
                 // Update the portName
                 portName.setServiceQName(wsdlService.getQName());
-                portName.setName(_port.getName());
+                portName.setName(_wsdlPort.getName());
+
+                _bindingId = WSDLUtil.getBindingId(_wsdlPort);
+                _messageComposer = SOAPComposition.getMessageComposer(_config, _wsdlPort);
 
                 URL wsdlUrl = WSDLUtil.getURL(_config.getWsdl());
                 LOGGER.info("Creating dispatch with WSDL " + wsdlUrl);
@@ -88,8 +92,10 @@ public class OutboundHandler extends BaseServiceHandler {
                 Service service = Service.create(wsdlUrl, portName.getServiceQName());
                 _dispatcher = service.createDispatch(portName.getPortQName(), SOAPMessage.class, Service.Mode.MESSAGE, new AddressingFeature(false, false));
                 // this does not return a proper qualified Fault element and has no Detail so deferring for now
-                // BindingProvider bp = (BindingProvider) _dispatcher;
-                // bp.getRequestContext().put("jaxws.response.throwExceptionIfSOAPFault", Boolean.FALSE);
+                // _dispatcher.getRequestContext().put("jaxws.response.throwExceptionIfSOAPFault", Boolean.FALSE);
+
+                // Defaulting to use soapAction property in request header
+                _dispatcher.getRequestContext().put(BindingProvider.SOAPACTION_USE_PROPERTY, Boolean.TRUE);
 
             } catch (MalformedURLException e) {
                 throw new WebServiceConsumeException(e);
@@ -116,13 +122,13 @@ public class OutboundHandler extends BaseServiceHandler {
     @Override
     public void handleMessage(final Exchange exchange) throws HandlerException {
         try {
-            if (SOAPUtil.SOAP_MESSAGE_FACTORY == null) {
+            if (SOAPUtil.getFactory(_bindingId) == null) {
                 throw new SOAPException("Failed to instantiate SOAP Message Factory");
             }
 
             SOAPMessage request;
             try {
-                request = _messageComposer.decompose(exchange, SOAPUtil.SOAP_MESSAGE_FACTORY.createMessage());
+                request = _messageComposer.decompose(exchange, SOAPUtil.createMessage(_bindingId));
             } catch (Exception e) {
                 throw e instanceof SOAPException ? (SOAPException)e : new SOAPException(e);
             }
@@ -162,14 +168,17 @@ public class OutboundHandler extends BaseServiceHandler {
         SOAPMessage response = null;
         try {
             String firstBodyElement = SOAPUtil.getFirstBodyElement(soapMessage);
-            if (WSDLUtil.isOneWay(_port, firstBodyElement)) {
+            String action = WSDLUtil.getSoapAction(_wsdlPort, firstBodyElement);
+            _dispatcher.getRequestContext().put(BindingProvider.SOAPACTION_URI_PROPERTY, "\"" + action + "\"");
+
+            if (WSDLUtil.isOneWay(_wsdlPort, firstBodyElement)) {
                 _dispatcher.invokeOneWay(soapMessage);
                 //return empty response
             } else {
                 response = _dispatcher.invoke(soapMessage);
             }
         } catch (SOAPFaultException sfex) {
-            response = SOAPUtil.generateFault(sfex);
+            response = SOAPUtil.generateFault(sfex, _bindingId);
         } catch (Exception ex) {
             throw new SOAPException("Cannot process SOAP request", ex);
         }

@@ -5,7 +5,7 @@
     <parent>
         <groupId>org.switchyard.components</groupId>
         <artifactId>switchyard-components-parent</artifactId>
-        <version>0.4.0.Final</version>
+        <version>0.5.0.Beta1</version>
         <relativePath>../../pom.xml</relativePath>
     </parent>
 
@@ -13,7 +13,7 @@
     <packaging>jar</packaging>
 
     <name>SwitchYard: Camel Component</name>
-    <url>http://www.switchyard.org</url>
+    <url>http://switchyard.org</url>
 
     <properties>
         <directory.camel.resources>${project.build.directory}/dependency/camel/resources</directory.camel.resources>
@@ -92,6 +92,11 @@
           <artifactId>switchyard-component-bean</artifactId>
        </dependency>
 
+        <dependency>
+            <groupId>org.switchyard.components</groupId>
+            <artifactId>switchyard-component-common-composer</artifactId>
+        </dependency>
+
          <dependency>
             <groupId>org.switchyard.components</groupId>
             <artifactId>switchyard-component-camel-as7</artifactId>
@@ -152,7 +157,35 @@
             <scope>compile</scope>
         </dependency>
 
-                <dependency>
+        <dependency>
+            <groupId>org.apache.camel</groupId>
+            <artifactId>camel-ftp</artifactId>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.camel</groupId>
+            <artifactId>camel-quartz</artifactId>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.camel</groupId>
+            <artifactId>camel-sql</artifactId>
+            <scope>compile</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.camel</groupId>
+            <artifactId>camel-netty</artifactId>
+            <scope>compile</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.apache.servicemix.bundles</groupId>
+                    <artifactId>org.apache.servicemix.bundles.netty</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <dependency>
             <groupId>org.apache.camel</groupId>
             <artifactId>camel-atom</artifactId>
             <scope>compile</scope>
@@ -172,11 +205,6 @@
             </exclusions>
         </dependency>
 
-        <dependency>
-            <groupId>org.fusesource.commonman</groupId>
-            <artifactId>commons-management</artifactId>
-            <scope>compile</scope>
-        </dependency>
         <dependency>
             <groupId>org.switchyard</groupId>
             <artifactId>switchyard-test</artifactId>

@@ -19,12 +19,9 @@
  
 package org.switchyard.component.soap;
 
-import java.net.MalformedURLException;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
+import javax.servlet.ServletRequest;
 import javax.wsdl.Operation;
 import javax.wsdl.Part;
 import javax.wsdl.Port;
@@ -32,9 +29,8 @@ import javax.wsdl.WSDLException;
 import javax.xml.namespace.QName;
 import javax.xml.soap.SOAPException;
 import javax.xml.soap.SOAPMessage;
-import javax.xml.transform.Source;
-import javax.xml.transform.stream.StreamSource;
-import javax.xml.ws.Endpoint;
+import javax.xml.ws.WebServiceContext;
+import javax.xml.ws.handler.MessageContext;
 
 import org.apache.log4j.Logger;
 import org.switchyard.Exchange;
@@ -45,17 +41,21 @@ import org.switchyard.Scope;
 import org.switchyard.ServiceDomain;
 import org.switchyard.ServiceReference;
 import org.switchyard.SynchronousInOutHandler;
+import org.switchyard.component.common.composer.MessageComposer;
 import org.switchyard.component.soap.composer.SOAPComposition;
 import org.switchyard.component.soap.config.model.SOAPBindingModel;
+import org.switchyard.component.soap.endpoint.EndpointPublisherFactory;
+import org.switchyard.component.soap.endpoint.WSEndpoint;
 import org.switchyard.component.soap.util.SOAPUtil;
 import org.switchyard.component.soap.util.WSDLUtil;
-import org.switchyard.composer.MessageComposer;
 import org.switchyard.deploy.BaseServiceHandler;
 import org.switchyard.exception.DeliveryException;
+import org.switchyard.policy.PolicyUtil;
+import org.switchyard.policy.SecurityPolicy;
 import org.w3c.dom.Node;
 
 /**
- * Hanldes SOAP requests to invoke a SwitchYard service.
+ * Handles SOAP requests to invoke a SwitchYard service.
  *
  * @author Magesh Kumar B <mageshbk@jboss.com> (C) 2011 Red Hat Inc.
  */
@@ -63,18 +63,17 @@ public class InboundHandler extends BaseServiceHandler {
 
     private static final Logger LOGGER = Logger.getLogger(InboundHandler.class);
     private static final long DEFAULT_TIMEOUT = 15000;
-    private static final String MESSAGE_NAME = "MESSAGE_NAME";
-    private static final String WSDL_LOCATION = "javax.xml.ws.wsdl.description";
+    private static final String MESSAGE_NAME = "org.switchyard.soap.messageName";
 
     private final SOAPBindingModel _config;
-    private final MessageComposer<SOAPMessage> _messageComposer;
-
+    
+    private MessageComposer<SOAPMessage> _messageComposer;
     private ServiceDomain _domain;
     private ServiceReference _service;
     private long _waitTimeout = DEFAULT_TIMEOUT; // default of 15 seconds
-    private Endpoint _endpoint;
+    private WSEndpoint _endpoint;
     private Port _wsdlPort;
-    private String _scheme = "http";
+    private String _bindingId;
 
     /**
      * Constructor.
@@ -84,7 +83,6 @@ public class InboundHandler extends BaseServiceHandler {
     public InboundHandler(final SOAPBindingModel config, ServiceDomain domain) {
         _config = config;
         _domain = domain;
-        _messageComposer = SOAPComposition.getMessageComposer(config);
     }
 
     /**
@@ -92,7 +90,6 @@ public class InboundHandler extends BaseServiceHandler {
      * @throws WebServicePublishException If unable to publish the endpoint
      */
     public void start() throws WebServicePublishException {
-        ClassLoader origLoader = Thread.currentThread().getContextClassLoader();
         try {
             _service = _domain.getServiceReference(_config.getServiceName());
             PortName portName = _config.getPort();
@@ -101,39 +98,13 @@ public class InboundHandler extends BaseServiceHandler {
             // Update the portName
             portName.setServiceQName(wsdlService.getQName());
             portName.setName(_wsdlPort.getName());
+            _bindingId = WSDLUtil.getBindingId(_wsdlPort);
+            _endpoint = EndpointPublisherFactory.getEndpointPublisher().publish(_config, _bindingId, this);
             
-            BaseWebService wsProvider = new BaseWebService();
-            wsProvider.setInvocationClassLoader(Thread.currentThread().getContextClassLoader());
-            // Hook the handler
-            wsProvider.setConsumer(this);
-            
-            List<Source> metadata = new ArrayList<Source>();
-            StreamSource source = WSDLUtil.getStream(_config.getWsdl());
-            metadata.add(source);
-            Map<String, Object> properties = new HashMap<String, Object>();
-            properties.put(Endpoint.WSDL_SERVICE, portName.getServiceQName());
-            properties.put(Endpoint.WSDL_PORT, portName.getPortQName());
-            properties.put(WSDL_LOCATION, WSDLUtil.getURL(_config.getWsdl()).toExternalForm());
-
-            String path = "/" + portName.getServiceName();
-            if (_config.getContextPath() != null) {
-                path = "/" + _config.getContextPath() + "/" + portName.getServiceName();
-            }
-            String publishUrl = _scheme + "://" + _config.getSocketAddr().getHost() + ":" + _config.getSocketAddr().getPort() + path;
-
-            LOGGER.info("Publishing WebService at " + publishUrl);
-            // make sure we don't pollute the class loader used by the WS subsystem
-            Thread.currentThread().setContextClassLoader(getClass().getClassLoader());
-            _endpoint = Endpoint.create(wsProvider);
-            _endpoint.setMetadata(metadata);
-            _endpoint.setProperties(properties);
-            _endpoint.publish(publishUrl);
-        } catch (MalformedURLException e) {
-            throw new WebServicePublishException(e);
+            // Create and configure the SOAP message composer
+            _messageComposer = SOAPComposition.getMessageComposer(_config, _wsdlPort);
         } catch (WSDLException e) {
             throw new WebServicePublishException(e);
-        } finally {
-            Thread.currentThread().setContextClassLoader(origLoader);
         }
     }
 
@@ -141,7 +112,9 @@ public class InboundHandler extends BaseServiceHandler {
      * Stop lifecycle.
      */
     public void stop() {
-        _endpoint.stop();
+        if (_endpoint != null) {
+            _endpoint.stop();
+        }
         LOGGER.info("WebService " + _config.getPort() + " stopped.");
     }
 
@@ -163,6 +136,16 @@ public class InboundHandler extends BaseServiceHandler {
      * @return the SOAP response
      */
     public SOAPMessage invoke(final SOAPMessage soapMessage) {
+        return invoke(soapMessage, null);
+    }
+
+    /**
+     * The delegate method called by the Webservice implementation.
+     * @param soapMessage the SOAP request
+     * @param wsContext the web service context
+     * @return the SOAP response
+     */
+    public SOAPMessage invoke(final SOAPMessage soapMessage, final WebServiceContext wsContext) {
         String operationName = null;
         Operation operation;
         Boolean oneWay = false;
@@ -176,7 +159,7 @@ public class InboundHandler extends BaseServiceHandler {
         }
         try {
             firstBodyElement = SOAPUtil.getFirstBodyElement(soapMessage);
-            operation = WSDLUtil.getOperation(_wsdlPort, firstBodyElement);
+            operation = WSDLUtil.getOperationByElement(_wsdlPort, firstBodyElement);
             if (operation != null) {
                 operationName = operation.getName();
                 oneWay = WSDLUtil.isOneWay(operation);
@@ -197,6 +180,18 @@ public class InboundHandler extends BaseServiceHandler {
         try {
             SynchronousInOutHandler inOutHandler = new SynchronousInOutHandler();
             Exchange exchange = _service.createExchange(operationName, inOutHandler);
+            
+            // Set appropriate policy based on the web service context
+            if (wsContext != null) {
+                if (wsContext.getUserPrincipal() != null) {
+                    PolicyUtil.provide(exchange, SecurityPolicy.CLIENT_AUTHENTICATION);
+                }
+                ServletRequest servletRequest = (ServletRequest)wsContext.getMessageContext().get(MessageContext.SERVLET_REQUEST);
+                if (servletRequest != null && servletRequest.isSecure()) {
+                    PolicyUtil.provide(exchange, SecurityPolicy.CONFIDENTIALITY);
+                }
+            }
+            
             Message message;
             try {
                 message = _messageComposer.compose(soapMessage, exchange, true);
@@ -204,7 +199,10 @@ public class InboundHandler extends BaseServiceHandler {
                 throw e instanceof SOAPException ? (SOAPException)e : new SOAPException(e);
             }
 
-            assertComposedMessageOK(message, operation);
+            // Do not perfom this check if the message has been unwrapped
+            if (_config.getSOAPMessageComposer() == null || !_config.getSOAPMessageComposer().isUnwrapped()) {
+                assertComposedMessageOK(message, operation);
+            }
 
             exchange.getContext().setProperty(MESSAGE_NAME, 
                     operation.getInput().getMessage().getQName().getLocalPart(),
@@ -222,12 +220,12 @@ public class InboundHandler extends BaseServiceHandler {
                     return handleException(oneWay, new SOAPException("Timed out after " + _waitTimeout + " ms waiting on synchronous response from target service '" + _service.getName() + "'."));
                 }
 
-                if (SOAPUtil.SOAP_MESSAGE_FACTORY == null) {
+                if (SOAPUtil.getFactory(_bindingId) == null) {
                     throw new SOAPException("Failed to instantiate SOAP Message Factory");
                 }
                 SOAPMessage soapResponse;
                 try {
-                    soapResponse = _messageComposer.decompose(exchange, SOAPUtil.SOAP_MESSAGE_FACTORY.createMessage());
+                    soapResponse = _messageComposer.decompose(exchange, SOAPUtil.createMessage(_bindingId));
                 } catch (Exception e) {
                     throw e instanceof SOAPException ? (SOAPException)e : new SOAPException(e);
                 }
@@ -252,10 +250,6 @@ public class InboundHandler extends BaseServiceHandler {
     private void assertComposedMessageOK(Message soapMessage, Operation operation) throws SOAPException {
         Node inputMessage = soapMessage.getContent(Node.class);
 
-        if (inputMessage == null) {
-            throw new SOAPException("Composer created a null ESB Message payload for service '" + _service.getName() + "'.  Must be of type '" + SOAPMessage.class.getName() + "'.");
-        }
-        
         String actualNS = inputMessage.getNamespaceURI();
         String actualLN = inputMessage.getLocalName();
         @SuppressWarnings("unchecked")
@@ -285,7 +279,7 @@ public class InboundHandler extends BaseServiceHandler {
             LOGGER.error(se);
         } else {
             try {
-                return SOAPUtil.generateFault(se);
+                return SOAPUtil.generateFault(se, _bindingId);
             } catch (SOAPException e) {
                 LOGGER.error(e);
             }

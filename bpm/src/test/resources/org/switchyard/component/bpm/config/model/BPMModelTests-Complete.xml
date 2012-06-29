@@ -22,9 +22,15 @@ MA  02110-1301, USA.
             xmlns:bpm="urn:switchyard-component-bpm:config:1.0">
     <sca:composite name="Foobar" targetNamespace="urn:bpm:test:1.0">
         <sca:component name="FoobarService">
-            <bpm:implementation.bpm processDefinition="foobar.bpmn" processDefinitionType="BPMN2" processId="foobar">
+            <bpm:implementation.bpm processDefinition="foobar.bpmn" processDefinitionType="BPMN2" processId="foobar" persistent="true" sessionId="3">
                 <bpm:taskHandler class="org.switchyard.component.bpm.task.work.SwitchYardServiceTaskHandler"/>
                 <bpm:resource location="foobar.drl" type="DRL"/>
+                <bpm:parameters>
+                    <bpm:mapping expression="message.content" variable="payload"/>
+                </bpm:parameters>
+                <bpm:results>
+                    <bpm:mapping expression="message.content = payload;"/>
+                </bpm:results>
             </bpm:implementation.bpm>
             <sca:service name="FoobarService">
                 <sca:interface.java interface="org.test.FoobarService"/>
