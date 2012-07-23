@@ -26,7 +26,7 @@
     <parent>
         <groupId>org.switchyard.components</groupId>
         <artifactId>switchyard-components-parent</artifactId>
-        <version>0.5.0.Beta1</version>
+        <version>0.6.0-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
@@ -56,7 +56,6 @@
         <dependency>
            <groupId>org.jboss.weld.se</groupId>
            <artifactId>weld-se-core</artifactId>
-           <scope>provided</scope>
         </dependency>
     </dependencies>
 

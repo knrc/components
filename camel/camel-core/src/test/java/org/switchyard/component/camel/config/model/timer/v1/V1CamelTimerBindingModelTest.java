@@ -57,9 +57,9 @@ public class V1CamelTimerBindingModelTest extends V1BaseCamelModelTest<V1CamelTi
         "timer://fooTimer?time=2011-01-01T12:00:00&pattern=yyyy-MM-dd'T'HH:mm:ss&" +
         "period=555&delay=100&fixedRate=true&daemon=false";
 
-    private static final String CAMEL_ENDPOINT_URI = "timer://fooTimer?" +
-            "daemon=false&delay=100&fixedRate=true&pattern=yyyy-MM-dd'T'HH:mm:ss&" +
-            "period=555&time=2011-01-01T12:00:00";
+    private static final String CAMEL_ENDPOINT_URI =
+        "timer://fooTimer?daemon=false&delay=100&fixedRate=true&pattern=yyyy-MM-dd%27T%27HH%3Amm%3Ass&" +
+        "period=555&time=2011-01-01T12%3A00%3A00";
 
     private Date referenceDate;
     

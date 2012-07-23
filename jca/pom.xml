@@ -26,7 +26,7 @@
     <parent>
         <groupId>org.switchyard.components</groupId>
         <artifactId>switchyard-components-parent</artifactId>
-        <version>0.5.0.Beta1</version>
+        <version>0.6.0-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
@@ -82,10 +82,6 @@
         <dependency>
             <groupId>org.jboss.as</groupId>
             <artifactId>jboss-as-connector</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.hornetq</groupId>
-            <artifactId>hornetq-ra</artifactId>
         </dependency>
         <dependency>
             <groupId>org.jboss.ironjacamar</groupId>

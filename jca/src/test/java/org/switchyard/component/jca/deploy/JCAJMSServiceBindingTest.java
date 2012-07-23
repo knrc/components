@@ -21,16 +21,13 @@
  */
 package org.switchyard.component.jca.deploy;
 
-import javax.jms.BytesMessage;
 import javax.jms.MessageProducer;
+import javax.jms.TextMessage;
 
-import org.jboss.shrinkwrap.api.ShrinkWrap;
-import org.jboss.shrinkwrap.api.spec.ResourceAdapterArchive;
 import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.switchyard.test.BeforeDeploy;
 import org.switchyard.test.MockHandler;
 import org.switchyard.test.SwitchYardRunner;
 import org.switchyard.test.SwitchYardTestCaseConfig;
@@ -38,7 +35,7 @@ import org.switchyard.test.SwitchYardTestKit;
 import org.switchyard.test.mixins.CDIMixIn;
 import org.switchyard.test.mixins.HornetQMixIn;
 import org.switchyard.test.mixins.jca.JCAMixIn;
-import org.switchyard.test.mixins.jca.JCAMixInConfig;
+import org.switchyard.test.mixins.jca.ResourceAdapterConfig;
 
 /**
  * Functional test for {@link JCAActivator}.
@@ -48,20 +45,26 @@ import org.switchyard.test.mixins.jca.JCAMixInConfig;
  */
 @RunWith(SwitchYardRunner.class)
 @SwitchYardTestCaseConfig(config = "switchyard-inbound-jms-test.xml", mixins = {CDIMixIn.class, JCAMixIn.class, HornetQMixIn.class})
-@JCAMixInConfig(hornetQResourceAdapter = "hornetq-ra.rar")
 public class JCAJMSServiceBindingTest  {
     
     private static final String INPUT_QUEUE = "TestQueue";
     private SwitchYardTestKit _testKit;
     private HornetQMixIn _hqMixIn;
+    private JCAMixIn _jcaMixIn;
+    
+    @BeforeDeploy
+    public void before() {
+        ResourceAdapterConfig ra = new ResourceAdapterConfig(ResourceAdapterConfig.ResourceAdapterType.HORNETQ);
+        _jcaMixIn.deployResourceAdapters(ra);
+    }
     
     @Test
     public void testInflowJMS() throws Exception {
         final MockHandler mockHandler = _testKit.registerInOutService("JCAJMSService");
         
         final MessageProducer producer = _hqMixIn.getJMSSession().createProducer(HornetQMixIn.getJMSQueue(INPUT_QUEUE));
-        BytesMessage msg = _hqMixIn.getJMSSession().createBytesMessage();
-        msg.writeBytes("payload".getBytes());
+        TextMessage msg = _hqMixIn.getJMSSession().createTextMessage();
+        msg.setText("payload");
         producer.send(msg);
         
         // wait for message to be picked up the HornetQ queue.
@@ -69,8 +72,8 @@ public class JCAJMSServiceBindingTest  {
         
         Assert.assertEquals(mockHandler.getMessages().size(), 1);
         final Object content = mockHandler.getMessages().poll().getMessage().getContent();
-        Assert.assertTrue(content instanceof byte[]);
-        final String string = new String((byte[])content);
+        Assert.assertTrue(content instanceof String);
+        final String string = (String) content;
         Assert.assertEquals(string, "payload");
     }
 }
