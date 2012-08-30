@@ -19,9 +19,9 @@
 
 package org.switchyard.component.camel.processor;
 
-import org.apache.camel.Message;
 import org.apache.camel.Processor;
 import org.switchyard.Exchange;
+import org.switchyard.component.camel.composer.CamelBindingData;
 import org.switchyard.component.common.composer.MessageComposer;
 
 /**
@@ -29,9 +29,9 @@ import org.switchyard.component.common.composer.MessageComposer;
  *
  * @author Magesh Kumar B <mageshbk@jboss.com> (C) 2012 Red Hat Inc.
  */
-public class DefaultProcessor implements Processor{
+public class DefaultProcessor implements Processor {
 
-    private final MessageComposer<Message> _messageComposer;
+    private final MessageComposer<CamelBindingData> _messageComposer;
     private Exchange _exchange;
 
     /**
@@ -40,7 +40,7 @@ public class DefaultProcessor implements Processor{
      * @param composer the message composer to be used
      * @param exchange the switchayrd exchange
      */
-    public DefaultProcessor(MessageComposer composer, Exchange exchange) {
+    public DefaultProcessor(MessageComposer<CamelBindingData> composer, Exchange exchange) {
         _messageComposer = composer;
         _exchange = exchange;
     }
@@ -50,7 +50,7 @@ public class DefaultProcessor implements Processor{
      */
     @Override
     public void process(org.apache.camel.Exchange camelExchange) throws Exception {
-        _messageComposer.decompose(_exchange, camelExchange.getIn());
+        _messageComposer.decompose(_exchange, new CamelBindingData(camelExchange.getIn()));
     }
 
     /**
@@ -67,7 +67,7 @@ public class DefaultProcessor implements Processor{
      *
      * @return the message composer
      */
-    public MessageComposer getComposer() {
+    public MessageComposer<CamelBindingData> getComposer() {
         return _messageComposer;
     }
 }

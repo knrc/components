@@ -55,6 +55,7 @@
         <module>bean</module>
         <module>rules</module>
         <module>bpm</module>
+        <module>resteasy</module>
         <module>soap</module>
         <module>bpel</module>
         <module>tests</module>
@@ -64,6 +65,7 @@
         <module>camel/camel-cdi</module>
         <module>clojure</module>
         <module>hornetq</module>
+        <module>http</module>
         <module>jca</module>
         <module>tools/forge</module>
     </modules>

@@ -32,36 +32,6 @@ public final class CamelConstants {
     public static final String HTTP_SCHEME = "http:";
 
     /**
-     * HTTP GET Method.
-     */
-    public static final String HTTP_GET_METHOD = "GET";
-
-    /**
-     * HTTP POST Method.
-     */
-    public static final String HTTP_POST_METHOD = "POST";
-
-    /**
-     * HTTP PUT Method.
-     */
-    public static final String HTTP_PUT_METHOD = "PUT";
-
-    /**
-     * HTTP DELETE Method.
-     */
-    public static final String HTTP_DELETE_METHOD = "DELETE";
-
-    /**
-     * HTTP HEAD Method.
-     */
-    public static final String HTTP_HEAD_METHOD = "HEAD";
-
-    /**
-     * HTTP OPTIONS Method.
-     */
-    public static final String HTTP_OPTIONS_METHOD = "OPTIONS";
-
-    /**
      * cxfrs transport scheme.
      */
     public static final String CXFRS_SCHEME = "cxfrs:";

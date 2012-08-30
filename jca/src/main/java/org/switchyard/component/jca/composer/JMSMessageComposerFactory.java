@@ -18,7 +18,6 @@
  */
 package org.switchyard.component.jca.composer;
 
-import javax.jms.Message;
 import org.switchyard.component.common.composer.MessageComposer;
 import org.switchyard.component.common.composer.MessageComposerFactory;
 
@@ -28,21 +27,21 @@ import org.switchyard.component.common.composer.MessageComposerFactory;
  * @author David Ward &lt;<a href="mailto:dward@jboss.org">dward@jboss.org</a>&gt; (C) 2011 Red Hat Inc.
  * @author <a href="mailto:tm.igarashi@gmail.com">Tomohisa Igarashi</a>
  */
-public class JMSMessageComposerFactory extends MessageComposerFactory<Message> {
+public class JMSMessageComposerFactory extends MessageComposerFactory<JMSBindingData> {
 
     /**
      * {@inheritDoc}
      */
     @Override
-    public Class<Message> getTargetClass() {
-        return Message.class;
+    public Class<JMSBindingData> getBindingDataClass() {
+        return JMSBindingData.class;
     }
 
     /**
      * {@inheritDoc}
      */
     @Override
-    public MessageComposer<Message> newMessageComposerDefault() {
+    public MessageComposer<JMSBindingData> newMessageComposerDefault() {
         return new JMSMessageComposer();
     }
 

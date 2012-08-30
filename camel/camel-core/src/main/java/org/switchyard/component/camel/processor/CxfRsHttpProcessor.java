@@ -21,8 +21,9 @@ package org.switchyard.component.camel.processor;
 
 import org.apache.camel.Exchange;
 import org.apache.camel.component.cxf.common.message.CxfConstants;
-import org.switchyard.component.camel.CamelConstants;
+import org.switchyard.component.camel.composer.CamelBindingData;
 import org.switchyard.component.common.composer.MessageComposer;
+import org.switchyard.component.common.rest.RsMethodUtil;
 
 /**
  * A cxfrs Camel Processor that uses HTTP client api. Sets the method based
@@ -42,7 +43,7 @@ public class CxfRsHttpProcessor extends DefaultProcessor {
      * @param composer the message composer to be used
      * @param exchange the switchayrd exchange
      */
-    public CxfRsHttpProcessor(MessageComposer composer, org.switchyard.Exchange exchange) {
+    public CxfRsHttpProcessor(MessageComposer<CamelBindingData> composer, org.switchyard.Exchange exchange) {
         super(composer, exchange);
     }
 
@@ -52,9 +53,9 @@ public class CxfRsHttpProcessor extends DefaultProcessor {
     @Override
     public void process(Exchange camelExchange) throws Exception {
         if (getExchange().getMessage().getContent() != null) {
-            camelExchange.getIn().setHeader(Exchange.HTTP_METHOD, CamelConstants.HTTP_POST_METHOD);
+            camelExchange.getIn().setHeader(Exchange.HTTP_METHOD, RsMethodUtil.HTTP_POST_METHOD);
         } else {
-            camelExchange.getIn().setHeader(Exchange.HTTP_METHOD, CamelConstants.HTTP_GET_METHOD);
+            camelExchange.getIn().setHeader(Exchange.HTTP_METHOD, RsMethodUtil.HTTP_GET_METHOD);
         }
         camelExchange.getIn().setHeader(CxfConstants.CAMEL_CXF_RS_RESPONSE_CLASS, String.class);
         camelExchange.getIn().setHeader(CxfConstants.CAMEL_CXF_RS_USING_HTTP_API, Boolean.TRUE);

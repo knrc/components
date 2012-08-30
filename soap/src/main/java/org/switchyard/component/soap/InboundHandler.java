@@ -42,6 +42,7 @@ import org.switchyard.ServiceDomain;
 import org.switchyard.ServiceReference;
 import org.switchyard.SynchronousInOutHandler;
 import org.switchyard.component.common.composer.MessageComposer;
+import org.switchyard.component.soap.composer.SOAPBindingData;
 import org.switchyard.component.soap.composer.SOAPComposition;
 import org.switchyard.component.soap.config.model.SOAPBindingModel;
 import org.switchyard.component.soap.endpoint.EndpointPublisherFactory;
@@ -50,6 +51,7 @@ import org.switchyard.component.soap.util.SOAPUtil;
 import org.switchyard.component.soap.util.WSDLUtil;
 import org.switchyard.deploy.BaseServiceHandler;
 import org.switchyard.exception.DeliveryException;
+import org.switchyard.exception.SwitchYardException;
 import org.switchyard.policy.PolicyUtil;
 import org.switchyard.policy.SecurityPolicy;
 import org.w3c.dom.Node;
@@ -67,7 +69,7 @@ public class InboundHandler extends BaseServiceHandler {
 
     private final SOAPBindingModel _config;
     
-    private MessageComposer<SOAPMessage> _messageComposer;
+    private MessageComposer<SOAPBindingData> _messageComposer;
     private ServiceDomain _domain;
     private ServiceReference _service;
     private long _waitTimeout = DEFAULT_TIMEOUT; // default of 15 seconds
@@ -194,7 +196,9 @@ public class InboundHandler extends BaseServiceHandler {
             
             Message message;
             try {
-                message = _messageComposer.compose(soapMessage, exchange, true);
+                // TODO: As part of SWITCHYARD-830, move the security policy provisions above into the SOAPContextMapper
+                //       using the as-of-now passed-in WebServiceContext.
+                message = _messageComposer.compose(new SOAPBindingData(soapMessage, wsContext), exchange, true);
             } catch (Exception e) {
                 throw e instanceof SOAPException ? (SOAPException)e : new SOAPException(e);
             }
@@ -219,15 +223,17 @@ public class InboundHandler extends BaseServiceHandler {
                 } catch (DeliveryException e) {
                     return handleException(oneWay, new SOAPException("Timed out after " + _waitTimeout + " ms waiting on synchronous response from target service '" + _service.getName() + "'."));
                 }
-
+                
                 if (SOAPUtil.getFactory(_bindingId) == null) {
                     throw new SOAPException("Failed to instantiate SOAP Message Factory");
                 }
                 SOAPMessage soapResponse;
                 try {
-                    soapResponse = _messageComposer.decompose(exchange, SOAPUtil.createMessage(_bindingId));
-                } catch (Exception e) {
-                    throw e instanceof SOAPException ? (SOAPException)e : new SOAPException(e);
+                    soapResponse = _messageComposer.decompose(exchange, new SOAPBindingData(SOAPUtil.createMessage(_bindingId))).getSOAPMessage();
+                } catch (SOAPException soapEx) {
+                    throw soapEx;
+                } catch (Exception ex) {
+                    throw new SwitchYardException(ex.getMessage());
                 }
                 if (exchange.getState() == ExchangeState.FAULT && soapResponse.getSOAPBody().getFault() == null) {
                     return handleException(oneWay, new SOAPException("Invalid response SOAPMessage construction.  The associated SwitchYard Exchange is in a FAULT state, "

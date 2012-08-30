@@ -21,19 +21,19 @@ package org.switchyard.component.common.composer;
 /**
  * Base class for MessageComposer.
  *
- * @param <T> the type of source/target object
+ * @param <D> the type of binding data
  *
  * @author David Ward &lt;<a href="mailto:dward@jboss.org">dward@jboss.org</a>&gt; (C) 2011 Red Hat Inc.
  */
-public abstract class BaseMessageComposer<T> implements MessageComposer<T> {
+public abstract class BaseMessageComposer<D extends BindingData> implements MessageComposer<D> {
 
-    private ContextMapper<T> _contextMapper;
+    private ContextMapper<D> _contextMapper;
 
     /**
      * {@inheritDoc}
      */
     @Override
-    public ContextMapper<T> getContextMapper() {
+    public ContextMapper<D> getContextMapper() {
         return _contextMapper;
     }
 
@@ -41,7 +41,7 @@ public abstract class BaseMessageComposer<T> implements MessageComposer<T> {
      * {@inheritDoc}
      */
     @Override
-    public MessageComposer<T> setContextMapper(ContextMapper<T> contextMapper) {
+    public MessageComposer<D> setContextMapper(ContextMapper<D> contextMapper) {
         _contextMapper = contextMapper;
         return this;
     }
