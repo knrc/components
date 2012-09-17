@@ -21,26 +21,19 @@
 package org.switchyard.component.camel.deploy;
 
 import java.net.URI;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.ServiceLoader;
 
-import javax.naming.NamingException;
 import javax.xml.namespace.QName;
 
 import org.apache.camel.CamelContext;
-import org.apache.camel.impl.CompositeRegistry;
-import org.apache.camel.impl.DefaultCamelContext;
-import org.apache.camel.impl.JndiRegistry;
-import org.apache.camel.impl.SimpleRegistry;
 import org.apache.camel.model.FromDefinition;
-import org.apache.camel.model.ModelCamelContext;
 import org.apache.camel.model.ProcessorDefinition;
 import org.apache.camel.model.RouteDefinition;
 import org.apache.camel.model.ToDefinition;
-import org.apache.camel.spi.PackageScanClassResolver;
-import org.apache.camel.spi.Registry;
+import org.apache.log4j.Logger;
+import org.switchyard.ServiceDomain;
 import org.switchyard.ServiceReference;
+import org.switchyard.common.camel.SwitchYardCamelContext;
 import org.switchyard.component.camel.InboundHandler;
 import org.switchyard.component.camel.OutboundHandler;
 import org.switchyard.component.camel.RouteFactory;
@@ -87,36 +80,51 @@ public class CamelActivator extends BaseActivator {
      * Camel can access the SY service domain.
      */
     public static final String SERVICE_DOMAIN = "org.switchyard.camel.serviceDomain";
+    
+    /**
+     * Camel activation types.
+     */
+    public static final String[] CAMEL_TYPES = new String[] {
+        V1CamelBindingModel.CAMEL, 
+        V1CamelAtomBindingModel.ATOM,
+        V1CamelDirectBindingModel.DIRECT,
+        V1CamelFileBindingModel.FILE,
+        V1CamelFtpBindingModel.FTP,
+        V1CamelFtpsBindingModel.FTPS,
+        V1CamelMockBindingModel.MOCK,
+        V1CamelNettyTcpBindingModel.NETTY_TCP,
+        V1CamelNettyUdpBindingModel.NETTY_UDP,
+        V1CamelSedaBindingModel.SEDA,
+        V1CamelSftpBindingModel.SFTP,
+        V1CamelTimerBindingModel.TIMER,
+        V1CamelJmsBindingModel.JMS,
+        V1CamelQuartzBindingModel.QUARTZ,
+        V1CamelSqlBindingModel.SQL
+    };
 
-    private ModelCamelContext _camelContext;
+    private SwitchYardCamelContext _camelContext;
+    private static Logger _logger = Logger.getLogger(CamelActivator.class);
+
     private Configuration _environment;
 
     /**
      * Creates a new activator for Camel endpoint types.
+     * 
+     * @param context Camel context to use.
      */
-    public CamelActivator() {
-        super(new String[] {
-            V1CamelBindingModel.CAMEL, 
-            V1CamelAtomBindingModel.ATOM,
-            V1CamelDirectBindingModel.DIRECT,
-            V1CamelFileBindingModel.FILE,
-            V1CamelFtpBindingModel.FTP,
-            V1CamelFtpsBindingModel.FTPS,
-            V1CamelMockBindingModel.MOCK,
-            V1CamelNettyTcpBindingModel.NETTY_TCP,
-            V1CamelNettyUdpBindingModel.NETTY_UDP,
-            V1CamelSedaBindingModel.SEDA,
-            V1CamelSftpBindingModel.SFTP,
-            V1CamelTimerBindingModel.TIMER,
-            V1CamelJmsBindingModel.JMS,
-            V1CamelQuartzBindingModel.QUARTZ,
-            V1CamelSqlBindingModel.SQL
-        });
+    public CamelActivator(SwitchYardCamelContext context) {
+        super(CAMEL_TYPES);
+        _camelContext = context;
+    }
+
+    @Override
+    public void setServiceDomain(ServiceDomain serviceDomain) {
+        super.setServiceDomain(serviceDomain);
+        _camelContext.getWritebleRegistry().put(SERVICE_DOMAIN, serviceDomain);
     }
 
     @Override
     public ServiceHandler activateBinding(QName serviceName, BindingModel config) {
-        start();
         CamelBindingModel binding = (CamelBindingModel)config;
         binding.setEnvironment(_environment);
 
@@ -129,9 +137,8 @@ public class CamelActivator extends BaseActivator {
     
     @Override
     public ServiceHandler activateService(QName serviceName, ComponentModel config) {
-        start();
         ServiceHandler handler = null;
-        
+
         // process service
         for (ComponentServiceModel service : config.getServices()) {
             if (service.getQName().equals(serviceName)) {
@@ -139,27 +146,8 @@ public class CamelActivator extends BaseActivator {
                 break;
             }
         }
-        
-        return handler;
-    }
 
-    /**
-     * Starts the camel context for this activator instance.
-     */
-    public void start() {
-        startCamelContext();
-    }
-    
-    /**
-     * Stops the camel context for this activator instance.
-     */
-    public void stop() {
-        stopCamelContext();
-    }
-    
-    @Override
-    public void destroy() {
-        stop();
+        return handler;
     }
 
     @Override
@@ -170,64 +158,6 @@ public class CamelActivator extends BaseActivator {
     @Override
     public void deactivateService(QName name, ServiceHandler handler) {
         // anything to do here?
-    }
-
-    private synchronized void startCamelContext() {
-        if (_camelContext == null) {
-            try {
-                _camelContext =  new DefaultCamelContext(getRegistry());
-            
-                final PackageScanClassResolver packageScanClassResolver = getPackageScanClassResolver();
-                if (packageScanClassResolver != null) {
-                    _camelContext.setPackageScanClassResolver(packageScanClassResolver);
-                }
-                _camelContext.start();
-            } catch (final Exception e) {
-                throw new SwitchYardException(e);
-            }
-        }
-    }
-
-    private synchronized void stopCamelContext() {
-        if (_camelContext != null) {
-            try {
-                _camelContext.stop();
-                _camelContext = null;
-            } catch (Exception ex) {
-                throw new SwitchYardException("CamelActivator failed to stop CamelContext.", ex);
-            }
-        }
-    }
-    
-    /**
-     * Get the first PackageScanClassResolver Service found on the classpath.
-     * @return The first PackageScanClassResolver Service found on the classpath.
-     */
-    public static PackageScanClassResolver getPackageScanClassResolver() {
-        final ServiceLoader<PackageScanClassResolver> resolverLoaders = ServiceLoader.load(PackageScanClassResolver.class, CamelActivator.class.getClassLoader());
-    
-        for (PackageScanClassResolver packageScanClassResolver : resolverLoaders) {
-            return packageScanClassResolver;
-        }
-    
-        return null;
-    }
-    
-    private Registry getRegistry() throws NamingException {
-        final ServiceLoader<Registry> registriesLoaders = ServiceLoader.load(Registry.class, getClass().getClassLoader());
-        final List<Registry> registries = new ArrayList<Registry>();
-        registries.add(new JndiRegistry());
-
-        for (Registry registry : registriesLoaders) {
-            registries.add(registry);
-        }
-        
-        // Simple registry to hold SY props in camel context
-        SimpleRegistry syProps = new SimpleRegistry();
-        syProps.put(SERVICE_DOMAIN, getServiceDomain());
-        registries.add(syProps);
-        
-        return new CompositeRegistry(registries);
     }
 
     private ServiceHandler handleImplementation(final ComponentServiceModel config, final QName serviceName) {
@@ -322,7 +252,7 @@ public class CamelActivator extends BaseActivator {
         final MessageComposer<CamelBindingData> messageComposer = CamelComposition.getMessageComposer(binding);
         return new OutboundHandler(endpointUri, _camelContext, messageComposer);
     }
-    
+
     /**
      * Gets the {@link CamelContext} used by this Activator.
      * 

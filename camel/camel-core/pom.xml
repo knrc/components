@@ -94,17 +94,12 @@
 
         <dependency>
             <groupId>org.switchyard.components</groupId>
-            <artifactId>switchyard-component-common-composer</artifactId>
+            <artifactId>switchyard-component-common</artifactId>
         </dependency>
 
         <dependency>
             <groupId>org.switchyard.components</groupId>
             <artifactId>switchyard-component-common-rest</artifactId>
-        </dependency>
-
-         <dependency>
-            <groupId>org.switchyard.components</groupId>
-            <artifactId>switchyard-component-camel-as7</artifactId>
         </dependency>
 
         <dependency>
@@ -116,6 +111,11 @@
         <dependency>
             <groupId>org.apache.camel</groupId>
             <artifactId>camel-core</artifactId>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.camel</groupId>
+            <artifactId>camel-cdi</artifactId>
             <scope>compile</scope>
         </dependency>
         <dependency>

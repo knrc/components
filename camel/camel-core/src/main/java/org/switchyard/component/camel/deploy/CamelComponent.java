@@ -19,6 +19,7 @@
 package org.switchyard.component.camel.deploy;
 
 import org.switchyard.ServiceDomain;
+import org.switchyard.common.camel.SwitchYardCamelContext;
 import org.switchyard.deploy.Activator;
 import org.switchyard.deploy.BaseComponent;
 
@@ -33,6 +34,7 @@ public class CamelComponent extends BaseComponent {
      * Default constructor.
      */
     public CamelComponent() {
+        super(CamelActivator.CAMEL_TYPES);
         setName("CamelComponent");
     }
 
@@ -41,7 +43,8 @@ public class CamelComponent extends BaseComponent {
      */
     @Override
     public Activator createActivator(ServiceDomain domain) {
-        CamelActivator activator = new CamelActivator();
+        CamelActivator activator = new CamelActivator((SwitchYardCamelContext) domain.getProperties()
+            .get(SwitchYardCamelContext.CAMEL_CONTEXT_PROPERTY));
         activator.setServiceDomain(domain);
         activator.setEnvironment(getConfig());
         return activator;
