@@ -1,6 +1,6 @@
 /* 
  * JBoss, Home of Professional Open Source 
- * Copyright 2011 Red Hat Inc. and/or its affiliates and other contributors
+ * Copyright 2012 Red Hat Inc. and/or its affiliates and other contributors
  * as indicated by the @author tags. All rights reserved. 
  * See the copyright.txt in the distribution for a 
  * full listing of individual contributors.
@@ -16,18 +16,9 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, 
  * MA  02110-1301, USA.
  */
-
 package org.switchyard.tools.forge.bpm;
 
-import static org.switchyard.component.bpm.ProcessConstants.MESSAGE_CONTENT_IN;
-import static org.switchyard.component.bpm.ProcessConstants.MESSAGE_CONTENT_IN_NAME;
-import static org.switchyard.component.bpm.ProcessConstants.MESSAGE_CONTENT_OUT;
-import static org.switchyard.component.bpm.ProcessConstants.MESSAGE_CONTENT_OUT_NAME;
-import static org.switchyard.component.bpm.ProcessConstants.PERSISTENT;
-import static org.switchyard.component.bpm.ProcessConstants.PROCESS_DEFINITION;
-import static org.switchyard.component.bpm.ProcessConstants.PROCESS_ID;
-import static org.switchyard.component.bpm.ProcessConstants.SESSION_ID;
-import static org.switchyard.component.bpm.task.work.SwitchYardServiceTaskHandler.SWITCHYARD_SERVICE;
+import static org.switchyard.component.bpm.config.model.BPMComponentImplementationModel.DEFAULT_NAMESPACE;
 
 import java.io.File;
 
@@ -50,14 +41,19 @@ import org.jboss.forge.shell.plugins.Plugin;
 import org.jboss.forge.shell.plugins.RequiresFacet;
 import org.jboss.forge.shell.plugins.RequiresProject;
 import org.jboss.forge.shell.plugins.Topic;
-import org.switchyard.common.io.resource.SimpleResource;
+import org.switchyard.common.io.resource.ResourceType;
+import org.switchyard.component.bpm.BPMActionType;
+import org.switchyard.component.bpm.config.model.v1.V1BPMActionModel;
 import org.switchyard.component.bpm.config.model.v1.V1BPMComponentImplementationModel;
-import org.switchyard.component.bpm.config.model.v1.V1TaskHandlerModel;
-import org.switchyard.component.bpm.task.work.SwitchYardServiceTaskHandler;
+import org.switchyard.component.common.knowledge.config.model.ActionModel;
+import org.switchyard.component.common.knowledge.config.model.v1.V1ActionsModel;
+import org.switchyard.component.common.knowledge.config.model.v1.V1ManifestModel;
 import org.switchyard.config.model.composite.InterfaceModel;
 import org.switchyard.config.model.composite.v1.V1ComponentModel;
 import org.switchyard.config.model.composite.v1.V1ComponentServiceModel;
 import org.switchyard.config.model.composite.v1.V1InterfaceModel;
+import org.switchyard.config.model.resource.v1.V1ResourceModel;
+import org.switchyard.config.model.resource.v1.V1ResourcesModel;
 import org.switchyard.config.model.switchyard.SwitchYardModel;
 import org.switchyard.tools.forge.plugin.SwitchYardFacet;
 import org.switchyard.tools.forge.plugin.TemplateResource;
@@ -80,8 +76,6 @@ public class BPMServicePlugin implements Plugin {
     private static final String PROCESS_DIR = "META-INF";
     // VAR_* constants reference substitution tokens in the process definition template 
     private static final String VAR_PROCESS_ID   = "${process.id}";
-    private static final String VAR_MESSAGE_CONTENT_IN_NAME = "${message.content.in.name}";
-    private static final String VAR_MESSAGE_CONTENT_OUT_NAME = "${message.content.out.name}";
     
     @Inject
     private Project _project;
@@ -96,10 +90,6 @@ public class BPMServicePlugin implements Plugin {
      * @param argProcessFilePath path to the BPMN process definition
      * @param argProcessId business process id
      * @param argPersistent persistent flag
-     * @param argSessionId session id
-     * @param argMessageContentInName process variable name for the content of the incoming message
-     * @param argMessageContentOutName process variable name for the content of the outgoing message
-     * @param argAgent whether to use an agent
      * @param out shell output
      * @throws java.io.IOException error with file resources
      */
@@ -114,36 +104,17 @@ public class BPMServicePlugin implements Plugin {
                     description = "The Java service interface")
             final String argInterfaceClass,
             @Option(required = false,
-                    name = PROCESS_DEFINITION,
+                    name = "processDefinition",
                     description = "The business process definition")
             final String argProcessFilePath,
             @Option(required = false,
-                    name = PROCESS_ID,
+                    name = "processId",
                     description = "The business process id")
             final String argProcessId,
             @Option(required = false,
-            name = PERSISTENT,
+            name = "persistent",
             description = "The persistent flag")
             final boolean argPersistent,
-            @Option(required = false,
-            name = SESSION_ID,
-            description = "The session id")
-            final Integer argSessionId,
-            @Option(required = false,
-                    name = MESSAGE_CONTENT_IN_NAME,
-                    description="The process variable name for the content of the incoming message (" + MESSAGE_CONTENT_IN + ")",
-                    defaultValue = MESSAGE_CONTENT_IN)
-            final String argMessageContentInName,
-            @Option(required = false,
-                    name = MESSAGE_CONTENT_OUT_NAME,
-                    description="The process variable name for the content of the outgoing message (" + MESSAGE_CONTENT_OUT + ")",
-                    defaultValue = MESSAGE_CONTENT_OUT)
-            final String argMessageContentOutName,
-            @Option(required = false,
-                    name = "agent",
-                    description = "Whether you want to use an agent to watch resources for changes (true|false)",
-                    defaultValue = "false")
-            final Boolean argAgent,
             final PipeOut out)
     throws java.io.IOException {
       
@@ -186,18 +157,14 @@ public class BPMServicePlugin implements Plugin {
             TemplateResource template = new TemplateResource(PROCESS_TEMPLATE)
                 .serviceName(argServiceName)
                 .replaceToken(VAR_PROCESS_ID, processId)
-                .replaceToken(VAR_MESSAGE_CONTENT_IN_NAME, argMessageContentInName)
-                .replaceToken(VAR_MESSAGE_CONTENT_OUT_NAME, argMessageContentOutName)
                 .packageName(pkgName);
             template.writeResource(_project.getFacet(ResourceFacet.class).getResource(processDefinitionPath));
             
             out.println("Created process definition [" + processDefinitionPath + "]");
         }
         
-        boolean agent = argAgent != null ? argAgent.booleanValue() : false;
-        
         // Add the SwitchYard config
-        createImplementationConfig(argServiceName, interfaceClass, processId, argPersistent, argSessionId, processDefinitionPath, argMessageContentInName, argMessageContentOutName, agent);
+        createImplementationConfig(argServiceName, interfaceClass, processId, argPersistent, processDefinitionPath);
           
         // Notify user of success
         out.println("Process service " + argServiceName + " has been created.");
@@ -207,11 +174,7 @@ public class BPMServicePlugin implements Plugin {
             String interfaceName,
             String processId,
             boolean persistent,
-            Integer sessionId,
-            String processDefinition,
-            String messageContentInName,
-            String messageContentOutName,
-            boolean agent) {
+            String processDefinition) {
         
         SwitchYardFacet switchYard = _project.getFacet(SwitchYardFacet.class);
         // Create the component service model
@@ -226,19 +189,17 @@ public class BPMServicePlugin implements Plugin {
         
         // Create the BPM implementation model and add it to the component model
         V1BPMComponentImplementationModel bpm = new V1BPMComponentImplementationModel();
-        bpm.setProcessDefinition(new SimpleResource(processDefinition));
         bpm.setProcessId(processId);
         bpm.setPersistent(persistent);
-        if (sessionId != null && sessionId.intValue() > -1) {
-            bpm.setSessionId(sessionId);
-        }
-        bpm.setMessageContentInName(messageContentInName);
-        bpm.setMessageContentOutName(messageContentOutName);
-        bpm.setAgent(agent);
-        V1TaskHandlerModel switchyardHandler = new V1TaskHandlerModel();
-        switchyardHandler.setName(SWITCHYARD_SERVICE);
-        switchyardHandler.setClazz(SwitchYardServiceTaskHandler.class);
-        bpm.addTaskHandler(switchyardHandler);
+        V1ActionsModel actions = new V1ActionsModel(DEFAULT_NAMESPACE);
+        ActionModel action = new V1BPMActionModel().setOperation("operation").setType(BPMActionType.START_PROCESS);
+        actions.addAction(action);
+        bpm.setActions(actions);
+        V1ManifestModel manifest = new V1ManifestModel(DEFAULT_NAMESPACE);
+        V1ResourcesModel resources = new V1ResourcesModel(DEFAULT_NAMESPACE);
+        resources.addResource(new V1ResourceModel(DEFAULT_NAMESPACE).setLocation(processDefinition).setType(ResourceType.valueOf("BPMN2")));
+        manifest.setResources(resources);
+        bpm.setManifest(manifest);
         component.setImplementation(bpm);
         
         // Add the new component service to the application config

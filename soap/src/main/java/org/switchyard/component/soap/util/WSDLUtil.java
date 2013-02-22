@@ -39,6 +39,7 @@ import javax.wsdl.Port;
 import javax.wsdl.Service;
 import javax.wsdl.WSDLException;
 import javax.wsdl.extensions.ExtensibilityElement;
+import javax.wsdl.extensions.soap.SOAPBinding;
 import javax.wsdl.extensions.soap.SOAPOperation;
 import javax.wsdl.extensions.soap12.SOAP12Operation;
 import javax.wsdl.factory.WSDLFactory;
@@ -46,13 +47,13 @@ import javax.wsdl.xml.WSDLReader;
 import javax.xml.XMLConstants;
 import javax.xml.namespace.QName;
 import javax.xml.transform.stream.StreamSource;
-import javax.xml.ws.soap.SOAPBinding;
 
 import org.apache.log4j.Logger;
 import org.switchyard.ExchangePattern;
 import org.switchyard.common.type.Classes;
 import org.switchyard.common.xml.XMLHelper;
 import org.switchyard.component.soap.PortName;
+import org.switchyard.exception.SwitchYardException;
 import org.w3c.dom.Document;
 import org.xml.sax.InputSource;
 
@@ -74,6 +75,11 @@ public final class WSDLUtil {
      * SOAP 1.2 QName namespace.
      */
     public static final String WSDL_SOAP12_URI = "http://schemas.xmlsoap.org/wsdl/soap12/";
+
+    /**
+     * Document style.
+     */
+    public static final String DOCUMENT = "document";
 
     private WSDLUtil() {
     }
@@ -226,15 +232,59 @@ public final class WSDLUtil {
     }
 
     /**
+     * Get the style for the port binding.
+     * @param port The WSDL port.
+     * @return The style, can be 'document' or 'rpc'.
+     */
+    @SuppressWarnings("unchecked")
+    public static String getStyle(Port port) {
+        String portStyle = null;
+        for (ExtensibilityElement element : (List<ExtensibilityElement>) port.getBinding().getExtensibilityElements()) {
+            if (element instanceof SOAPBinding) {
+                String bindingStyle = ((SOAPBinding) element).getStyle();
+                if (bindingStyle != null) {
+                    portStyle = bindingStyle.toLowerCase();
+                }
+            }
+        }
+
+        String operationStyle = null;
+        for (BindingOperation operation : (List<BindingOperation>) port.getBinding().getBindingOperations()) {
+            for (ExtensibilityElement element : (List<ExtensibilityElement>) operation.getExtensibilityElements()) {
+                if (element instanceof SOAPOperation) {
+                    String currentOperationStyle = ((SOAPOperation) element).getStyle();
+                    if (currentOperationStyle != null) {
+                        if (operationStyle != null && !currentOperationStyle.equals(operationStyle)) {
+                            throw new SwitchYardException("Incompatible style of soap operation level bindings detected");
+                        }
+                        operationStyle = currentOperationStyle;
+                    }
+                }
+            }
+        }
+
+        if (operationStyle != null && portStyle != null) {
+            if (!portStyle.equals(operationStyle)) {
+                throw new SwitchYardException("Detected mixing different soap binding style on port type and operation level");
+            }
+            return portStyle;
+        } else if (portStyle != null) {
+            return portStyle;
+        } else if (operationStyle != null) {
+            return operationStyle;
+        }
+        return DOCUMENT; //default
+    }
+
+    /**
      * Get the SOAP {@link Operation} instance for the specified message element.
      * @param port The WSDL port.
      * @param elementName The SOAP Body element name.
      * @return The Operation instance, or null if the operation was not found on the port.
      */
     public static Operation getOperationByElement(Port port, String elementName) {
-        
         List<Operation> operations = port.getBinding().getPortType().getOperations();
-        
+
         for (Operation operation : operations) {
             Part part = (Part)operation.getInput().getMessage().getParts().values().iterator().next();
             if (elementName.equals(part.getElementName().getLocalPart())) {
@@ -270,11 +320,11 @@ public final class WSDLUtil {
      * @return The SOAPBinding Id found on the port.
      */
     public static String getBindingId(Port port) {
-        String bindingId = SOAPBinding.SOAP11HTTP_BINDING;
+        String bindingId = javax.xml.ws.soap.SOAPBinding.SOAP11HTTP_BINDING;
         List<ExtensibilityElement> extElements = port.getExtensibilityElements();
         for (ExtensibilityElement extElement : extElements) {
             if (extElement.getElementType().getNamespaceURI().equals(WSDL_SOAP12_URI)) {
-                bindingId = SOAPBinding.SOAP12HTTP_BINDING;
+                bindingId = javax.xml.ws.soap.SOAPBinding.SOAP12HTTP_BINDING;
             }
             break;
         }

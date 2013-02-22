@@ -95,9 +95,13 @@ public class CCIProcessor extends AbstractOutboundProcessor {
 
             InitialContext ic = new InitialContext();
             _connectionFactory = (ConnectionFactory) ic.lookup(getConnectionFactoryJNDIName());
-            _recordFactory = _connectionFactory.getRecordFactory();
         } catch (Exception e) {
             throw new SwitchYardException("Failed to initialize " + this.getClass().getName(), e);
+        }
+        try {
+            _recordFactory = _connectionFactory.getRecordFactory();
+        } catch (ResourceException e) {
+            _logger.warn("Failed to get RecordFactory: " + e.getMessage());
         }
     }
 
@@ -118,8 +122,12 @@ public class CCIProcessor extends AbstractOutboundProcessor {
             throw new HandlerException("Failed to process CCI outbound interaction", e);
         } finally {
             try {
-                interaction.close();
-                connection.close();
+                if (interaction != null) {
+                    interaction.close();
+                }
+                if (connection != null) {
+                    connection.close();
+                }
             } catch (ResourceException e) {
                 _logger.warn("Failed to close Interaction/Connection: " + e.getMessage());
                 if (_logger.isDebugEnabled()) {

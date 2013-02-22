@@ -20,13 +20,17 @@
 package org.switchyard.component.soap.composer;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
 import javax.wsdl.Operation;
 import javax.wsdl.Part;
 import javax.wsdl.Port;
+import javax.xml.soap.Detail;
+import javax.xml.soap.DetailEntry;
 import javax.xml.soap.SOAPBody;
 import javax.xml.soap.SOAPException;
+import javax.xml.soap.SOAPFault;
 import javax.xml.soap.SOAPMessage;
 import javax.xml.transform.dom.DOMSource;
 
@@ -50,6 +54,10 @@ import org.w3c.dom.NodeList;
  */
 public class SOAPMessageComposer extends BaseMessageComposer<SOAPBindingData> {
 
+    // Constant suffix used for the reply wrapper when the composer is configured to 
+    // wrap response messages with operation name.
+    private static final String DOC_LIT_WRAPPED_REPLY_SUFFIX = "Response";
+    
     private static Logger _log = Logger.getLogger(SOAPMessageComposer.class);
     private SOAPMessageComposerModel _config;
     private Port _wsdlPort;
@@ -68,15 +76,34 @@ public class SOAPMessageComposer extends BaseMessageComposer<SOAPBindingData> {
         if (soapBody == null) {
             throw new SOAPException("Missing SOAP body from request");
         }
-        List<Element> bodyChildren = getChildElements(soapBody);
 
         try {
+            if (soapBody.hasFault()) {
+                // peel off the Fault element
+                SOAPFault fault = soapBody.getFault();
+                if (fault.hasDetail()) {
+                    Detail detail = fault.getDetail();
+                    // We only support one entry at this moment
+                    DetailEntry entry = null;
+                    Iterator<DetailEntry> entries = detail.getDetailEntries();
+                    if (entries.hasNext()) {
+                        entry = entries.next();
+                    }
+                    if (entry != null) {
+                        Node detailNode = entry.getParentNode().removeChild(entry);
+                        message.setContent(new DOMSource(detailNode));
+                        return message;
+                    }
+                }
+            }
+
+            List<Element> bodyChildren = getChildElements(soapBody);
             if (bodyChildren.size() > 1) {
                 throw new SOAPException("Found multiple SOAPElements in SOAPBody");
             } else if (bodyChildren.size() == 0 || bodyChildren.get(0) == null) {
                 throw new SOAPException("Could not find SOAPElement in SOAPBody");
             }
-            
+
             Node bodyNode = bodyChildren.get(0);
             if (_config != null && _config.isUnwrapped()) {
                 // peel off the operation wrapper, if present
@@ -91,7 +118,6 @@ public class SOAPMessageComposer extends BaseMessageComposer<SOAPBindingData> {
                     }
                 }
             }
-            
             bodyNode = bodyNode.getParentNode().removeChild(bodyNode);
             message.setContent(new DOMSource(bodyNode));
         } catch (Exception ex) {
@@ -115,7 +141,7 @@ public class SOAPMessageComposer extends BaseMessageComposer<SOAPBindingData> {
         if (message != null) {
             // check to see if the payload is null or it's a full SOAP Message
             if (message.getContent() == null) {
-                throw new SOAPException("Null response from service");
+                throw new SOAPException("Unable to create SOAP Body due to null message content");
             }
             if (message.getContent() instanceof SOAPMessage) {
                 return new SOAPBindingData((SOAPMessage)message.getContent());
@@ -130,8 +156,9 @@ public class SOAPMessageComposer extends BaseMessageComposer<SOAPBindingData> {
                         String opName = exchange.getContract().getProviderOperation().getName();
                         String ns = getWrapperNamespace(opName, exchange.getPhase() == null);
                         // Don't wrap if it's already wrapped
-                        if (!messageNodeImport.getLocalName().equals(opName)) {
-                            Element wrapper = messageNodeImport.getOwnerDocument().createElementNS(ns, opName);
+                        if (!messageNodeImport.getLocalName().equals(opName + DOC_LIT_WRAPPED_REPLY_SUFFIX)) {
+                            Element wrapper = messageNodeImport.getOwnerDocument().createElementNS(
+                                    ns, opName + DOC_LIT_WRAPPED_REPLY_SUFFIX);
                             wrapper.appendChild(messageNodeImport);
                             messageNodeImport = wrapper;
                         }

@@ -51,14 +51,14 @@ public class V1SOAPMessageComposerModelTest {
 
     @Test
     public void testWriteConfig() throws Exception {
-        V1SOAPMessageComposerModel smd = new V1SOAPMessageComposerModel();
-        smd.setUnwrapped(true);
+        V1SOAPMessageComposerModel scm = new V1SOAPMessageComposerModel();
+        scm.setUnwrapped(true);
 
         V1SOAPMessageComposerModel refModel = new ModelPuller<V1SOAPMessageComposerModel>()
                 .pull(COMPOSER_FRAG, getClass());
         
         XMLUnit.setIgnoreWhitespace(true);
-        Diff diff = XMLUnit.compareXML(refModel.toString(), smd.toString());
+        Diff diff = XMLUnit.compareXML(refModel.toString(), scm.toString());
         Assert.assertTrue(diff.toString(), diff.similar());
     }
 }

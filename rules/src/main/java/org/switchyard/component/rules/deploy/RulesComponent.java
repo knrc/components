@@ -1,6 +1,6 @@
 /* 
  * JBoss, Home of Professional Open Source 
- * Copyright 2011 Red Hat Inc. and/or its affiliates and other contributors
+ * Copyright 2012 Red Hat Inc. and/or its affiliates and other contributors
  * as indicated by the @author tags. All rights reserved. 
  * See the copyright.txt in the distribution for a 
  * full listing of individual contributors.
@@ -19,15 +19,13 @@
 package org.switchyard.component.rules.deploy;
 
 import org.switchyard.ServiceDomain;
-import org.switchyard.component.common.rules.util.drools.ResourceChangeService;
-import org.switchyard.config.Configuration;
 import org.switchyard.deploy.Activator;
 import org.switchyard.deploy.BaseComponent;
 
 /**
  * An implementation of Rules component.
  *
- * @author Magesh Kumar B <mageshbk@jboss.com> (C) 2011 Red Hat Inc.
+ * @author Magesh Kumar B <mageshbk@jboss.com> &copy; 2012 Red Hat Inc.
  */
 public class RulesComponent extends BaseComponent {
 
@@ -37,24 +35,6 @@ public class RulesComponent extends BaseComponent {
     public RulesComponent() {
         super(RulesActivator.RULES_TYPE);
         setName("RulesComponent");
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void init(Configuration config) {
-        super.init(config);
-        ResourceChangeService.start(this);
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void destroy() {
-        ResourceChangeService.stop(this);
-        super.destroy();
     }
 
     /**

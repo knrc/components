@@ -27,9 +27,9 @@ import junit.framework.Assert;
 
 import org.junit.Before;
 import org.junit.Test;
-import org.switchyard.component.common.selector.config.model.StaticOperationSelectorModel;
 import org.switchyard.component.jca.config.model.JCABindingModel;
 import org.switchyard.config.model.ModelPuller;
+import org.switchyard.config.model.selector.StaticOperationSelectorModel;
 import org.switchyard.config.model.switchyard.SwitchYardModel;
 
 /**
@@ -72,6 +72,8 @@ public class V1JCABindingModelInboundTest {
         Assert.assertEquals("org.switchyard.component.jca.endpoint.JMSEndpoint", jbm.getInboundInteraction().getEndpoint().getEndpointClassName());
         Assert.assertEquals("value2", jbm.getInboundInteraction().getEndpoint().getProperty("prop2"));
         Assert.assertEquals(true, jbm.getInboundInteraction().isTransacted());
+        Assert.assertEquals(5, jbm.getInboundInteraction().getBatchCommit().getBatchSize());
+        Assert.assertEquals(5000, jbm.getInboundInteraction().getBatchCommit().getBatchTimeout());
     }
     
 }

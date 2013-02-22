@@ -39,6 +39,7 @@ import org.switchyard.Message;
 import org.switchyard.component.common.composer.MessageComposer;
 import org.switchyard.component.soap.composer.SOAPBindingData;
 import org.switchyard.component.soap.composer.SOAPComposition;
+import org.switchyard.component.soap.composer.SOAPFaultInfo;
 import org.switchyard.component.soap.config.model.SOAPBindingModel;
 import org.switchyard.component.soap.util.SOAPUtil;
 import org.switchyard.component.soap.util.WSDLUtil;
@@ -59,6 +60,7 @@ public class OutboundHandler extends BaseServiceHandler {
     private Dispatch<SOAPMessage> _dispatcher;
     private Port _wsdlPort;
     private String _bindingId;
+    private Boolean _documentStyle;
 
     /**
      * Constructor.
@@ -84,6 +86,9 @@ public class OutboundHandler extends BaseServiceHandler {
                 portName.setName(_wsdlPort.getName());
 
                 _bindingId = WSDLUtil.getBindingId(_wsdlPort);
+                String style = WSDLUtil.getStyle(_wsdlPort);
+                _documentStyle = style.equals("document") ? true : false;
+
                 _messageComposer = SOAPComposition.getMessageComposer(_config, _wsdlPort);
 
                 URL wsdlUrl = WSDLUtil.getURL(_config.getWsdl());
@@ -97,6 +102,9 @@ public class OutboundHandler extends BaseServiceHandler {
 
                 // Defaulting to use soapAction property in request header
                 _dispatcher.getRequestContext().put(BindingProvider.SOAPACTION_USE_PROPERTY, Boolean.TRUE);
+                if (_config.getEndpointAddress() != null) {
+                    _dispatcher.getRequestContext().put(BindingProvider.ENDPOINT_ADDRESS_PROPERTY, _config.getEndpointAddress());
+                }
 
             } catch (MalformedURLException e) {
                 throw new WebServiceConsumeException(e);
@@ -133,20 +141,32 @@ public class OutboundHandler extends BaseServiceHandler {
             } catch (Exception e) {
                 throw e instanceof SOAPException ? (SOAPException)e : new SOAPException(e);
             }
-            
             if (LOGGER.isTraceEnabled()) {
                 LOGGER.trace("Request:[" + SOAPUtil.soapMessageToString(request) + "]");
             }
             
             SOAPMessage response = invokeService(request);
             if (response != null) {
+                // This property vanishes once message composer processes this message
+                // so caching it here
+                Boolean hasFault = response.getSOAPBody().hasFault();
                 Message message;
                 try {
-                    message = _messageComposer.compose(new SOAPBindingData(response), exchange, true);
+                    SOAPBindingData bindingData = new SOAPBindingData(response);
+                    if (hasFault) {
+                        SOAPFaultInfo faultInfo = new SOAPFaultInfo();
+                        faultInfo.copyFaultInfo(response);
+                        bindingData.setSOAPFaultInfo(faultInfo);
+                    }
+                    message = _messageComposer.compose(bindingData, exchange, true);
                 } catch (Exception e) {
                     throw e instanceof SOAPException ? (SOAPException)e : new SOAPException(e);
                 }
-                exchange.send(message);
+                if (hasFault) {
+                    exchange.sendFault(message);
+                } else {
+                    exchange.send(message);
+                }
             }
             
             if (LOGGER.isTraceEnabled()) {

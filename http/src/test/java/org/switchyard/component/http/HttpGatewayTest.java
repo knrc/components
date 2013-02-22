@@ -47,7 +47,7 @@ import org.switchyard.test.Invoker;
 import org.switchyard.test.MockHandler;
 import org.switchyard.test.SwitchYardRunner;
 import org.switchyard.test.SwitchYardTestCaseConfig;
-import org.switchyard.test.mixins.HTTPMixIn;
+import org.switchyard.component.test.mixins.http.HTTPMixIn;
 
 /**
  * Contains tests for HTTP Gateway.
@@ -145,7 +145,7 @@ public class HttpGatewayTest {
         Context ctx = ex.getContext();
         Message requestMsg = ex.createMessage().setContent("magesh");
         ex.send(requestMsg);
-        handler.waitForOKMessage();
+        handler.waitForFaultMessage();
         Assert.assertEquals(404, ctx.getProperty("status", Scope.IN).getValue());
     }
 
