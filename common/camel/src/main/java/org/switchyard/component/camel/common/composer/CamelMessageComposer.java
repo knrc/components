@@ -29,12 +29,15 @@ import java.util.Set;
 import javax.activation.DataHandler;
 import javax.activation.DataSource;
 import javax.xml.namespace.QName;
+import javax.xml.transform.Source;
 
 import org.switchyard.Exchange;
 import org.switchyard.Message;
 import org.switchyard.common.xml.QNameUtil;
 import org.switchyard.component.common.composer.BaseMessageComposer;
 import org.switchyard.metadata.ServiceOperation;
+import org.w3c.dom.Node;
+import org.xml.sax.InputSource;
 
 /**
  * The Camel implementation of MessageComposer.
@@ -42,19 +45,20 @@ import org.switchyard.metadata.ServiceOperation;
  * @author David Ward &lt;<a href="mailto:dward@jboss.org">dward@jboss.org</a>&gt; (C) 2011 Red Hat Inc.
  */
 public class CamelMessageComposer extends BaseMessageComposer<CamelBindingData> {
-
+    
     /**
      * {@inheritDoc}
      */
     @Override
     public Message compose(CamelBindingData source, Exchange exchange, boolean create) throws Exception {
+        Message message = create ? exchange.createMessage() : exchange.getMessage();
+
         // map context properties
-        getContextMapper().mapFrom(source, exchange.getContext());
+        getContextMapper().mapFrom(source, exchange.getContext(message));
 
         org.apache.camel.Message sourceMessage = source.getMessage();
 
         // map content
-        Message message = create ? exchange.createMessage() : exchange.getMessage();
         QName msgType = getMessageType(exchange);
         Object content;
         if (msgType == null) {
@@ -62,7 +66,12 @@ public class CamelMessageComposer extends BaseMessageComposer<CamelBindingData> 
         } else if (QNameUtil.isJavaMessageType(msgType)) {
             content = sourceMessage.getBody(QNameUtil.toJavaMessageType(msgType));
         } else {
-            content = sourceMessage.getBody(InputStream.class);
+            content = sourceMessage.getBody();
+            if (!(content instanceof String) && !(content instanceof Node)
+                    && !(content instanceof InputSource) && !(content instanceof Source)) {
+                // named binary content - content is not String nor XML, but has type name other than "java:*"
+                content = sourceMessage.getBody(InputStream.class);
+            }
         }
         message.setContent(content);
 
@@ -81,9 +90,9 @@ public class CamelMessageComposer extends BaseMessageComposer<CamelBindingData> 
      */
     @Override
     public CamelBindingData decompose(Exchange exchange, CamelBindingData target) throws Exception {
+        Message sourceMessage = exchange.getMessage();
         getContextMapper().mapTo(exchange.getContext(), target);
 
-        Message sourceMessage = exchange.getMessage();
         org.apache.camel.Message targetMessage = target.getMessage();
 
         if (!sourceMessage.getAttachmentMap().isEmpty()) {
@@ -111,7 +120,7 @@ public class CamelMessageComposer extends BaseMessageComposer<CamelBindingData> 
         if (exchange.getPhase() == null) {
             msgType = exchange.getContract().getConsumerOperation().getInputType();
         } else {
-            msgType = exchange.getContract().getConsumerOperation().getOutputType();
+            msgType = exchange.getContract().getProviderOperation().getOutputType();
         }
         
         return msgType;

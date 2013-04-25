@@ -23,6 +23,10 @@ import java.util.Properties;
 import org.switchyard.Exchange;
 import org.switchyard.HandlerException;
 import org.switchyard.Message;
+import org.switchyard.component.common.composer.MessageComposer;
+import org.switchyard.component.jca.composer.JCABindingData;
+import org.switchyard.component.jca.composer.JCAComposition;
+import org.switchyard.component.jca.config.model.JCABindingModel;
 
 /**
  * Abstract class for processing outbound delivery regarding to JCA outbound contract.
@@ -34,6 +38,7 @@ public abstract class AbstractOutboundProcessor {
     private String _connectionFactoryJNDIName;
     private Properties _mcfProperties;
     private ClassLoader _appClassLoader;
+    private JCABindingModel _jcaBindingModel;
     
     /**
      * process outbound delivery.
@@ -130,5 +135,27 @@ public abstract class AbstractOutboundProcessor {
      */
     public ClassLoader getApplicationClassLoader() {
         return _appClassLoader;
+    }
+    
+    /**
+     * set JCA binding model.
+     * @param model JCA binding model
+     * @return {@link AbstractOutboundProcessor} to support method chaining
+     */
+    public AbstractOutboundProcessor setJCABindingModel(JCABindingModel model) {
+        _jcaBindingModel = model;
+        return this;
+    }
+    
+    /**
+     * get JCA binding model.
+     * @return JCA binding model
+     */
+    public JCABindingModel getJCABindingModel() {
+        return _jcaBindingModel;
+    }
+    
+    protected <D extends JCABindingData> MessageComposer<D> getMessageComposer(Class<D> clazz) {
+        return JCAComposition.getMessageComposer(_jcaBindingModel, clazz);
     }
 }

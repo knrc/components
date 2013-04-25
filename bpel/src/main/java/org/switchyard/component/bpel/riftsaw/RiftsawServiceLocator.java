@@ -237,13 +237,7 @@ public class RiftsawServiceLocator implements ServiceLocator {
         }
 
         /**
-         * This method invokes the external switchyard service.
-         * 
-         * @param operationName The operation
-         * @param mesg The message
-         * @param headers The optional headers
-         * @return The response
-         * @throws Exception Failed to invoke
+         * {@inheritDoc}
          */
         public Element invoke(String operationName, Element mesg,
                 Map<String, Object> headers) throws Exception {
@@ -254,17 +248,21 @@ public class RiftsawServiceLocator implements ServiceLocator {
             // Need to create an exchange
             SynchronousInOutHandler rh = new SynchronousInOutHandler();
             Exchange exchange=_serviceReference.createExchange(operationName, rh);
-            
-            Message req=exchange.createMessage();            
+
+            Message req = exchange.createMessage();
             req.setContent(mesg);
             if (headers != null) {
                 Set<String> keys = headers.keySet();
                 for (String key : keys) {
-                    exchange.getContext().setProperty(key,headers.get(key), Scope.IN).addLabels(EndpointLabel.SOAP.label());
+                    exchange.getContext(req).setProperty(key,headers.get(key)).addLabels(EndpointLabel.SOAP.label());
                 }
+
+                // Clear the headers in preparation for response headers
+                headers.clear();
             }
-            exchange.send(req);
             
+            exchange.send(req);
+
             try {
                 exchange = rh.waitForOut(_waitTimeout);
             } catch (DeliveryException e) {
@@ -278,8 +276,14 @@ public class RiftsawServiceLocator implements ServiceLocator {
             if (resp == null) {
                 throw new Exception("Response not returned from operation '"
                            + operationName
-                           + "' on service: "+_serviceReference.getName());
-                
+                           + "' on service: "+_serviceReference.getName());                
+            }
+            
+            // Process header values associated with the response
+            for (org.switchyard.Property p : exchange.getContext().getProperties(Scope.MESSAGE)) {
+                if (p.hasLabel(EndpointLabel.SOAP.label())) {
+                    headers.put(p.getName(), p.getValue());
+                }
             }
             
             // Check for exception - but don't rethrow a BPEL
