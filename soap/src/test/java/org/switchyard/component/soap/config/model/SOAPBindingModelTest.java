@@ -35,8 +35,11 @@ public class SOAPBindingModelTest {
     @Test
     public void testReadConfigBinding() throws Exception {
         ModelPuller<SOAPBindingModel> puller = new ModelPuller<SOAPBindingModel>();
-        SOAPBindingModel model = puller.pull(SOAP_BINDING, getClass());
-        Assert.assertTrue(model.isModelValid());
-        Assert.assertEquals("Missing endpoint address", model.getEndpointAddress(), "http://modified.com/phantom");
+        SOAPBindingModel binding = puller.pull(SOAP_BINDING, getClass());
+        binding.assertModelValid();
+        Assert.assertEquals("http://modified.com/phantom", binding.getEndpointAddress());
+        EndpointConfigModel endpointConfig = binding.getEndpointConfig();
+        Assert.assertEquals("myFile", endpointConfig.getConfigFile());
+        Assert.assertEquals("myName", endpointConfig.getConfigName());
     }
 }

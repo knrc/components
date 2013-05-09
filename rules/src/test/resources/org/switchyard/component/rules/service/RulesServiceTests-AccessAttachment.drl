@@ -1,5 +1,5 @@
 # JBoss, Home of Professional Open Source
-# Copyright 2011 Red Hat Inc. and/or its affiliates and other contributors
+# Copyright 2013 Red Hat Inc. and/or its affiliates and other contributors
 # as indicated by the @authors tag. All rights reserved.
 # See the copyright.txt in the distribution for a
 # full listing of individual contributors.
@@ -15,7 +15,16 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-bpel1.namespace=http://docs.oasis-open.org/ns/opencsa/sca/200903
-bpel1.schema=bpel-v1.xsd
-bpel1.location=/org/switchyard/component/bpel/config/model/v1/
-bpel1.marshaller=org.switchyard.component.bpel.config.model.v1.V1BPELMarshaller
+package org.switchyard.component.rules.service;
+
+import javax.activation.DataSource;
+import org.switchyard.common.io.pull.StringPuller;
+import org.switchyard.component.rules.service.RulesServiceTests.Holder;
+
+rule "AccessAttachment"
+    when
+        $attachment : DataSource()
+        $holder : Holder()
+    then
+        $holder.setValue(new StringPuller().pull($attachment.getInputStream()));
+end

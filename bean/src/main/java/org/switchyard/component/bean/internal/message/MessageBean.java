@@ -1,6 +1,6 @@
 /* 
  * JBoss, Home of Professional Open Source 
- * Copyright 2011 Red Hat Inc. and/or its affiliates and other contributors
+ * Copyright 2013 Red Hat Inc. and/or its affiliates and other contributors
  * as indicated by the @author tags. All rights reserved. 
  * See the copyright.txt in the distribution for a 
  * full listing of individual contributors.
@@ -16,28 +16,26 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, 
  * MA  02110-1301, USA.
  */
-package org.switchyard.component.bpel.process;
+package org.switchyard.component.bean.internal.message;
 
-import javax.xml.namespace.QName;
+import org.switchyard.Message;
+import org.switchyard.component.bean.internal.InternalBean;
 
 /**
- * Various constants and context variables.
+ * Message Bean.
+ * <p/>
+ * CDI bean for injecting the SwitchYard Message into consumer beans.
  *
+ * @author <a href="mailto:tom.fennelly@gmail.com">tom.fennelly@gmail.com</a>
+ * @author David Ward &lt;<a href="mailto:dward@jboss.org">dward@jboss.org</a>&gt; &copy; 2013 Red Hat Inc.
  */
-public final class ProcessConstants {
+public class MessageBean extends InternalBean {
 
-    private ProcessConstants() {
-    }
-    
     /**
-     * The default process namespace.
+     * Public constructor.
      */
-    public static final String PROCESS_NAMESPACE = "http://docs.oasis-open.org/ns/opencsa/sca/200903";
-
-    /** processDescriptor . */
-    public static final String PROCESS = "process";
-    
-    /** {http://docs.oasis-open.org/ns/opencsa/sca/200903}process . */
-    public static final String PROCESS_VAR = new QName(PROCESS_NAMESPACE, PROCESS).toString();
+    public MessageBean() {
+        super(new MessageProxy(), Message.class);
+    }
 
 }

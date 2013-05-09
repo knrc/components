@@ -1,6 +1,6 @@
 /* 
  * JBoss, Home of Professional Open Source 
- * Copyright 2012 Red Hat Inc. and/or its affiliates and other contributors
+ * Copyright 2013 Red Hat Inc. and/or its affiliates and other contributors
  * as indicated by the @author tags. All rights reserved. 
  * See the copyright.txt in the distribution for a 
  * full listing of individual contributors.
@@ -16,28 +16,40 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, 
  * MA  02110-1301, USA.
  */
-package org.switchyard.component.common.knowledge;
+package org.switchyard.component.soap.config.model;
+
+import org.switchyard.config.model.Model;
 
 /**
- * Rules constants.
+ * A SOAP Value Model.
  *
- * @author David Ward &lt;<a href="mailto:dward@jboss.org">dward@jboss.org</a>&gt; &copy; 2012 Red Hat Inc.
+ * @author David Ward &lt;<a href="mailto:dward@jboss.org">dward@jboss.org</a>&gt; &copy; 2013 Red Hat Inc.
  */
-public final class KnowledgeConstants {
+public interface SOAPNameValueModel extends Model {
 
-    /** default. */
-    public static final String DEFAULT = "default";
+    /** Known XML element names. */
+    public enum SOAPName {
+        /** Known XML element names. */
+        wsdl, wsdlPort, socketAddr, contextPath, endpointAddress;
+    }
 
-    /** context. */
-    public static final String CONTEXT = "context";
-    /** message. */
-    public static final String MESSAGE = "message";
+    /**
+     * Gets the name.
+     * @return the name
+     */
+    public SOAPName getName();
 
-    /** contentInput. */
-    public static final String CONTENT_INPUT = "contentInput";
-    /** contentOutput. */
-    public static final String CONTENT_OUTPUT = "contentOutput";
+    /**
+     * Gets the value.
+     * @return the value
+     */
+    public String getValue();
 
-    private KnowledgeConstants() {}
+    /**
+     * Sets the value.
+     * @param value the value
+     * @return this SOAPValueModel (useful for chaining)
+     */
+    public SOAPNameValueModel setValue(String value);
 
 }

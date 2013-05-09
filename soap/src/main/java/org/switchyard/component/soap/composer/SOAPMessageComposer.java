@@ -22,10 +22,14 @@ package org.switchyard.component.soap.composer;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.UUID;
 
+import javax.activation.DataHandler;
+import javax.mail.util.ByteArrayDataSource;
 import javax.wsdl.Operation;
 import javax.wsdl.Part;
 import javax.wsdl.Port;
+import javax.xml.soap.AttachmentPart;
 import javax.xml.soap.Detail;
 import javax.xml.soap.DetailEntry;
 import javax.xml.soap.SOAPBody;
@@ -57,10 +61,18 @@ public class SOAPMessageComposer extends BaseMessageComposer<SOAPBindingData> {
     // Constant suffix used for the reply wrapper when the composer is configured to 
     // wrap response messages with operation name.
     private static final String DOC_LIT_WRAPPED_REPLY_SUFFIX = "Response";
-    
+
+    private static final String CONTENT_DISPOSITION = "Content-Disposition";
+    private static final String CONTENT_ID = "Content-ID";
+    private static final String CONTENT_ID_START = "<";
+    private static final String CONTENT_DISPOSITION_NAME = "name=";
+    private static final String CONTENT_DISPOSITION_QUOTE = "\"";
+    private static final String TEMP_FILE_EXTENSION = ".tmp";
+
     private static Logger _log = Logger.getLogger(SOAPMessageComposer.class);
     private SOAPMessageComposerModel _config;
     private Port _wsdlPort;
+    private Boolean _documentStyle;
 
     /**
      * {@inheritDoc}
@@ -69,6 +81,7 @@ public class SOAPMessageComposer extends BaseMessageComposer<SOAPBindingData> {
     public Message compose(SOAPBindingData source, Exchange exchange, boolean create) throws Exception {
         final SOAPMessage soapMessage = source.getSOAPMessage();
         final Message message = create ? exchange.createMessage() : exchange.getMessage();
+        final Boolean input = exchange.getPhase() == null;
 
         getContextMapper().mapFrom(source, exchange.getContext(message));
 
@@ -105,21 +118,47 @@ public class SOAPMessageComposer extends BaseMessageComposer<SOAPBindingData> {
             }
 
             Node bodyNode = bodyChildren.get(0);
-            if (_config != null && _config.isUnwrapped()) {
-                // peel off the operation wrapper, if present
-                String opName = exchange.getContract().getConsumerOperation().getName();
-                if (opName != null && opName.equals(bodyNode.getLocalName())) {
-                    List<Element> subChildren = getChildElements(bodyNode);
-                    if (subChildren.size() == 0 || subChildren.size() > 1) {
-                        _log.debug("Unable to unwrap element: " + bodyNode.getLocalName()
-                               + ". A single child element is required.");
-                    } else {
-                        bodyNode = subChildren.get(0);
+            if (_documentStyle) {
+                if (_config != null && _config.isUnwrapped()) {
+                    String opName = exchange.getContract().getConsumerOperation().getName();
+                    // peel off the operation wrapper, if present
+                    if (opName != null && opName.equals(bodyNode.getLocalName())) {
+                        List<Element> subChildren = getChildElements(bodyNode);
+                        if (subChildren.size() == 0 || subChildren.size() > 1) {
+                            _log.debug("Unable to unwrap element: " + bodyNode.getLocalName()
+                                   + ". A single child element is required.");
+                        } else {
+                            bodyNode = subChildren.get(0);
+                        }
                     }
                 }
             }
             bodyNode = bodyNode.getParentNode().removeChild(bodyNode);
             message.setContent(new DOMSource(bodyNode));
+
+            // SOAP Attachments
+            Iterator<AttachmentPart> aparts = (Iterator<AttachmentPart>) soapMessage.getAttachments();
+            while (aparts.hasNext()) {
+                AttachmentPart apRequest = aparts.next();
+                String name = apRequest.getDataHandler().getDataSource().getName();
+                if ((name == null) || (name.length() == 0)) {
+                    String[] disposition = apRequest.getMimeHeader(CONTENT_DISPOSITION);
+                    String[] contentId = apRequest.getMimeHeader(CONTENT_ID);
+                    name = (contentId != null) ? contentId[0] : null;
+                    if ((name == null) && (disposition != null)) {
+                        int start = disposition[0].indexOf(CONTENT_DISPOSITION_NAME);
+                        String namePart = disposition[0].substring(start + CONTENT_DISPOSITION_NAME.length() + 1);
+                        int end = namePart.indexOf(CONTENT_DISPOSITION_QUOTE);
+                        name = namePart.substring(0, end);
+                    } else if (name == null) {
+                        // TODO: Identify the extension using content-type
+                        name = UUID.randomUUID() + TEMP_FILE_EXTENSION;
+                    } else if (name.startsWith(CONTENT_ID_START)) {
+                        name = name.substring(1, name.length() - 1);
+                    }
+                }
+                message.addAttachment(name, new ByteArrayDataSource(apRequest.getDataHandler().getInputStream(), apRequest.getDataHandler().getContentType()));
+            }
         } catch (Exception ex) {
             if (ex instanceof SOAPException) {
                 throw (SOAPException) ex;
@@ -137,6 +176,7 @@ public class SOAPMessageComposer extends BaseMessageComposer<SOAPBindingData> {
     public SOAPBindingData decompose(Exchange exchange, SOAPBindingData target) throws Exception {
         final SOAPMessage soapMessage = target.getSOAPMessage();
         final Message message = exchange.getMessage();
+        final Boolean input = exchange.getPhase() == null;
 
         if (message != null) {
             // check to see if the payload is null or it's a full SOAP Message
@@ -149,21 +189,30 @@ public class SOAPMessageComposer extends BaseMessageComposer<SOAPBindingData> {
             
             try {
                 // convert the message content to a form we can work with
-                org.w3c.dom.Node input = message.getContent(org.w3c.dom.Node.class);
-                org.w3c.dom.Node messageNodeImport = soapMessage.getSOAPBody().getOwnerDocument().importNode(input, true);
-                if (exchange.getState() != ExchangeState.FAULT || isSOAPFaultPayload(input)) {
-                    if (_config != null && _config.isUnwrapped()) {
+                Node messageNode = message.getContent(Node.class);
+                Node messageNodeImport = soapMessage.getSOAPBody().getOwnerDocument().importNode(messageNode, true);
+                if (exchange.getState() != ExchangeState.FAULT || isSOAPFaultPayload(messageNode)) {
+                    if (_documentStyle) {
                         String opName = exchange.getContract().getProviderOperation().getName();
-                        String ns = getWrapperNamespace(opName, exchange.getPhase() == null);
-                        // Don't wrap if it's already wrapped
-                        if (!messageNodeImport.getLocalName().equals(opName + DOC_LIT_WRAPPED_REPLY_SUFFIX)) {
-                            Element wrapper = messageNodeImport.getOwnerDocument().createElementNS(
-                                    ns, opName + DOC_LIT_WRAPPED_REPLY_SUFFIX);
-                            wrapper.appendChild(messageNodeImport);
-                            messageNodeImport = wrapper;
+                        if (_config != null && _config.isUnwrapped()) {
+                            String ns = getWrapperNamespace(opName, input);
+                            // Don't wrap if it's already wrapped
+                            if (!messageNodeImport.getLocalName().equals(opName + DOC_LIT_WRAPPED_REPLY_SUFFIX)) {
+                                Element wrapper = messageNodeImport.getOwnerDocument().createElementNS(
+                                        ns, opName + DOC_LIT_WRAPPED_REPLY_SUFFIX);
+                                wrapper.appendChild(messageNodeImport);
+                                messageNodeImport = wrapper;
+                            }
                         }
                     }
                     soapMessage.getSOAPBody().appendChild(messageNodeImport);
+                    // SOAP Attachments
+                    for (String name : message.getAttachmentMap().keySet()) {
+                        AttachmentPart apResponse = soapMessage.createAttachmentPart();
+                        apResponse.setDataHandler(new DataHandler(message.getAttachment(name)));
+                        apResponse.setContentId("<" + name + ">");
+                        soapMessage.addAttachmentPart(apResponse);
+                    }
                 } else {
                     // convert to SOAP Fault since ExchangeState is FAULT but the message is not SOAP Fault
                     SOAPUtil.addFault(soapMessage).addDetail().appendChild(messageNodeImport);
@@ -217,7 +266,7 @@ public class SOAPMessageComposer extends BaseMessageComposer<SOAPBindingData> {
 
         return false;
     }
-    
+
     // Retrieves the immediate child of the specified parent element
     private List<Element> getChildElements(Node parent) {
         List<Element> children = new ArrayList<Element>();
@@ -230,20 +279,24 @@ public class SOAPMessageComposer extends BaseMessageComposer<SOAPBindingData> {
         
         return children;
     }
-    
+
     private String getWrapperNamespace(String operationName, boolean input) {
         String ns = null;
-        
-        if (_wsdlPort != null) {
-            Operation op = WSDLUtil.getOperationByName(_wsdlPort, operationName);
-            @SuppressWarnings("unchecked")
-            List<Part> parts = input ? op.getInput().getMessage().getOrderedParts(null) 
-                    : op.getOutput().getMessage().getOrderedParts(null);
 
-            if (parts.get(0).getElementName() != null) {
-                ns = parts.get(0).getElementName().getNamespaceURI();
-            } else if (parts.get(0).getTypeName() != null) {
-                ns = parts.get(0).getTypeName().getNamespaceURI();
+        if (_wsdlPort != null) {
+            Operation operation = WSDLUtil.getOperationByName(_wsdlPort, operationName);
+            if (!_documentStyle) {
+                ns = input ? operation.getInput().getMessage().getQName().getNamespaceURI()
+                    : operation.getOutput().getMessage().getQName().getNamespaceURI();
+            } else {
+                // Note: WS-I Profile allows only one child under SOAPBody.
+                Part part = input ? (Part)operation.getInput().getMessage().getParts().values().iterator().next()
+                    : (Part)operation.getOutput().getMessage().getParts().values().iterator().next();
+                if (part.getElementName() != null) {
+                    ns = part.getElementName().getNamespaceURI();
+                } else if (part.getTypeName() != null) {
+                    ns = part.getTypeName().getNamespaceURI();
+                }
             }
         }
         
@@ -264,6 +317,22 @@ public class SOAPMessageComposer extends BaseMessageComposer<SOAPBindingData> {
      */
     public void setWsdlPort(Port wsdlPort) {
         _wsdlPort = wsdlPort;
+    }
+
+    /**
+     * Check if the WSDL used is of 'document' style.
+     * @return true if 'document' style, false otherwise
+     */
+    public Boolean isDocumentStyle() {
+        return _documentStyle;
+    }
+
+    /**
+     * Set that the WSDL used is of 'document' style.
+     * @param style true or false
+     */
+    public void setDocumentStyle(Boolean style) {
+        _documentStyle = style;
     }
 
 }
