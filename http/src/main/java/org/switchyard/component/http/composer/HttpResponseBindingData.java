@@ -19,8 +19,6 @@
  
 package org.switchyard.component.http.composer;
 
-import javax.servlet.http.HttpServletResponse;
-
 /**
  * HTTP response binding data.
  *
@@ -28,13 +26,13 @@ import javax.servlet.http.HttpServletResponse;
  */
 public class HttpResponseBindingData extends HttpBindingData {
 
-    private int _status = HttpServletResponse.SC_ACCEPTED;
+    private Integer _status;
 
     /**
      * Get the HTTP response status.
      * @return HTTP response status
      */
-    public int getStatus() {
+    public Integer getStatus() {
         return _status;
     }
 
@@ -42,7 +40,7 @@ public class HttpResponseBindingData extends HttpBindingData {
      * Set the HTTP response status.
      * @param status the response status
      */
-    public void setStatus(int status) {
+    public void setStatus(Integer status) {
         _status = status;
     }
 }

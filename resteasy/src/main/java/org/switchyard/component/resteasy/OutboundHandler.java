@@ -125,11 +125,11 @@ public class OutboundHandler extends BaseServiceHandler {
             final String m = "Unable to map " + opName + " among resources " + _methodMap.keySet();
             throw new HandlerException(m);
         }
-        RESTEasyBindingData restResponse = methodInvoker.invoke(restRequest.getParameters(), restRequest.getHeaders());
 
         try {
+            RESTEasyBindingData restResponse = methodInvoker.invoke(restRequest.getParameters(), restRequest.getHeaders());
             restResponse.setOperationName(opName);
-            Message out = _messageComposer.compose(restResponse, exchange, true);
+            Message out = _messageComposer.compose(restResponse, exchange);
             // Our transformer magic transforms the entity appropriately here :)
             exchange.send(out);
         } catch (Exception e) {
