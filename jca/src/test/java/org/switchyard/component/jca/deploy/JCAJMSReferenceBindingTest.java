@@ -73,7 +73,7 @@ public class JCAJMSReferenceBindingTest  {
         final MessageConsumer consumer = _hqMixIn.getJMSSession().createConsumer(HornetQMixIn.getJMSQueue(OUTPUT_QUEUE));
         javax.jms.Message msg = consumer.receive(1000);
         _hqMixIn.readJMSMessageAndTestString(msg, payload+"test");
-        Assert.assertEquals(msg.getStringProperty("testProp"), "testVal");
+        Assert.assertEquals("testVal", msg.getStringProperty("testProp"));
         
     }
     
@@ -87,7 +87,7 @@ public class JCAJMSReferenceBindingTest  {
         Assert.assertTrue(msg instanceof TextMessage);
         javax.jms.TextMessage txtmsg = TextMessage.class.cast(msg);
         Assert.assertEquals(payload+"test", txtmsg.getText());
-        Assert.assertEquals(msg.getStringProperty("testProp"), "testVal");
+        Assert.assertEquals("testVal", msg.getStringProperty("testProp"));
         
     }
     
@@ -105,7 +105,7 @@ public class JCAJMSReferenceBindingTest  {
         
         javax.jms.Message msg = consumer.receive(1000);
         _hqMixIn.readJMSMessageAndTestString(msg, payload+"test");
-        Assert.assertEquals(msg.getStringProperty("testProp"), "testVal");
+        Assert.assertEquals("testVal", msg.getStringProperty("testProp"));
     }
 }
 

@@ -18,22 +18,25 @@
  */
 package org.switchyard.component.camel;
 
+import java.util.List;
+
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.model.RouteDefinition;
 import org.junit.Assert;
 import org.junit.Test;
-import org.switchyard.component.camel.Route;
-import org.switchyard.component.camel.RouteFactory;
 import org.switchyard.component.camel.scanner.ServiceInterface;
 import org.switchyard.component.camel.scanner.SingleRouteService;
+import org.switchyard.exception.SwitchYardException;
 
 public class RouteFactoryTest {
 
     @Test
     public void createRouteFromClass() {
-        RouteDefinition route = RouteFactory.createRoute(SingleRouteService.class.getName());
+        List<RouteDefinition> routes = RouteFactory.createRoute(SingleRouteService.class.getName());
 
-        Assert.assertNotNull(route);
+        Assert.assertNotNull(routes);
+        Assert.assertEquals(1, routes.size());
+        RouteDefinition route = routes.get(0);
         Assert.assertEquals(1, route.getInputs().size());
         Assert.assertEquals(2, route.getOutputs().size());
     }
@@ -56,6 +59,29 @@ public class RouteFactoryTest {
         } catch (RuntimeException ex) {
             System.err.println("Java DSL class without a route was rejected: " + ex.toString());
         }
+    }
+    
+    @Test
+    public void noRoutesDefinedXML() {
+        try {
+            RouteFactory.loadRoute("org/switchyard/component/camel/deploy/not-a-route.xml");
+        } catch (SwitchYardException syEx) {
+            System.err.println("Invalid Camel XML definition rejected: " + syEx.toString());
+        }
+    }
+    
+    @Test
+    public void singleRouteXML() {
+        List<RouteDefinition> routes = 
+                RouteFactory.loadRoute("org/switchyard/component/camel/deploy/route.xml");
+        Assert.assertEquals(1, routes.size());
+    }
+    
+    @Test
+    public void multiRouteXML() {
+        List<RouteDefinition> routes = 
+                RouteFactory.loadRoute("org/switchyard/component/camel/deploy/routes.xml");
+        Assert.assertEquals(2, routes.size());
     }
 }
 

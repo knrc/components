@@ -18,12 +18,22 @@
  */
 package org.switchyard.component.camel;
 
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
+import javax.xml.bind.JAXBContext;
+import javax.xml.bind.JAXBException;
+import javax.xml.transform.Source;
+import javax.xml.transform.stream.StreamSource;
+
+import org.apache.camel.CamelContext;
 import org.apache.camel.builder.RouteBuilder;
+import org.apache.camel.model.Constants;
 import org.apache.camel.model.RouteDefinition;
+import org.apache.camel.model.RoutesDefinition;
 import org.switchyard.common.type.Classes;
-import org.switchyard.component.camel.common.SwitchYardRouteDefinition;
+import org.switchyard.component.camel.model.CamelComponentImplementationModel;
 import org.switchyard.exception.SwitchYardException;
 
 /**
@@ -31,6 +41,19 @@ import org.switchyard.exception.SwitchYardException;
  * methods and Java DSL route definitions.
  */
 public final class RouteFactory {
+
+    /**
+     * JAXB context for reading XML definitions.
+     */
+    private static JAXBContext JAXB_CONTEXT;
+
+    static {
+        try {
+            JAXB_CONTEXT = JAXBContext.newInstance(Constants.JAXB_CONTEXT_PACKAGES, CamelContext.class.getClassLoader());
+        } catch (JAXBException e) {
+            throw new SwitchYardException(e);
+        }
+    }
 
     /** 
      * Utility class - so no need to directly instantiate.
@@ -40,11 +63,55 @@ public final class RouteFactory {
     }
 
     /**
+     * Returns a list of route definitions referenced by a camel implementation.
+     * @param model implementation config model
+     * @return list of route definitions
+     */
+    public static List<RouteDefinition> getRoutes(CamelComponentImplementationModel model) {
+        if (model.getJavaClass() != null) {
+            return createRoute(model.getJavaClass(), model.getComponent().getTargetNamespace());
+        }
+        return loadRoute(model.getXMLPath());
+    }
+
+    /**
+     * Loads a set of route definitions from an XML file.
+     * @param xmlPath path to the file containing one or more route definitions
+     * @return list of route definitions
+     */
+    public static List<RouteDefinition> loadRoute(String xmlPath) {
+        List<RouteDefinition> routes = null;
+        
+        try {
+            Source source =  new StreamSource(Classes.getResourceAsStream(xmlPath));
+            Object obj = JAXB_CONTEXT.createUnmarshaller().unmarshal(source);
+            
+            // Look for <routes> or <route> as top-level element
+            if (obj instanceof RoutesDefinition) {
+                routes = ((RoutesDefinition)obj).getRoutes();
+            } else if (obj instanceof RouteDefinition) {
+                routes = new ArrayList<RouteDefinition>(1);
+                routes.add((RouteDefinition)obj);
+            }
+            
+            // If we couldn't find a <route> or <routes> definition, throw an error
+            if (routes == null) {
+                throw new SwitchYardException("No routes found in XML file " + xmlPath);
+            }
+            return routes;
+        } catch (JAXBException e) {
+            throw new SwitchYardException(e);
+        } catch (IOException e) {
+            throw new SwitchYardException(e);
+        }
+    }
+
+    /**
      * Create a new route from the given class name and service name.
      * @param className name of the class containing an @Route definition
      * @return the route definition
      */
-    public static RouteDefinition createRoute(String className) {
+    public static List<RouteDefinition> createRoute(String className) {
         return createRoute(className, null);
     }
 
@@ -54,7 +121,7 @@ public final class RouteFactory {
      * @param namespace the namespace to append to switchyard:// service URIs
      * @return the route definition
      */
-    public static RouteDefinition createRoute(String className, String namespace) {
+    public static List<RouteDefinition> createRoute(String className, String namespace) {
         return createRoute(Classes.forName(className), namespace);
     }
 
@@ -63,7 +130,7 @@ public final class RouteFactory {
      * @param routeClass class containing an @Route definition
      * @return the route definition
      */
-    public static RouteDefinition createRoute(Class<?> routeClass) {
+    public static List<RouteDefinition> createRoute(Class<?> routeClass) {
         return createRoute(routeClass, null);
     }
 
@@ -73,7 +140,7 @@ public final class RouteFactory {
      * @param namespace the namespace to append to switchyard:// service URIs
      * @return the route definition
      */
-    public static RouteDefinition createRoute(Class<?> routeClass, String namespace) {
+    public static List<RouteDefinition> createRoute(Class<?> routeClass, String namespace) {
         if (!RouteBuilder.class.isAssignableFrom(routeClass)) {
             throw new SwitchYardException("Java DSL class " + routeClass.getName() 
                 + " must extend " + RouteBuilder.class.getName());
@@ -81,31 +148,18 @@ public final class RouteFactory {
 
         // Create the route and tell it to create a route
         RouteBuilder builder;
-        RouteDefinition route = null;
         try {
             builder = (RouteBuilder) routeClass.newInstance();
             builder.configure();
+            List<RouteDefinition> routes = builder.getRouteCollection().getRoutes();
+            if (routes.isEmpty()) {
+                throw new SwitchYardException("No routes found in Java DSL class " + routeClass.getName());
+            }
+            return routes;
         } catch (Exception ex) {
             throw new SwitchYardException("Failed to initialize Java DSL class " 
                     + routeClass.getName(), ex);
         }
-        
-        // Make sure the generated route is legit
-        List<RouteDefinition> routes = builder.getRouteCollection().getRoutes();
-        if (routes.isEmpty()) {
-            throw new SwitchYardException("No routes found in Java DSL class "
-                    + routeClass.getName());
-        } else if (routes.size() > 1) {
-            throw new SwitchYardException("Only one route allowed per Java DSL class "
-                    + routeClass.getName());
-        }
-        route = routes.get(0);
-        if (route.getInputs().size() != 1) {
-            throw new SwitchYardException("Java DSL routes must contain a single 'from' "
-                    + routeClass.getName());
-        }
-        SwitchYardRouteDefinition.addNamespaceParameter(route, namespace);
-        return route;
     }
 
 }

@@ -35,6 +35,7 @@
     </parent>
     <modules>
         <module>mixins/amqp</module>
+        <module>mixins/activemq</module>
         <module>mixins/bpm</module>
         <module>mixins/naming</module>
         <module>mixins/cdi</module>
