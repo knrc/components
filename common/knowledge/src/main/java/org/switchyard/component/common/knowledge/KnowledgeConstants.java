@@ -33,10 +33,10 @@ public final class KnowledgeConstants {
     /** message. */
     public static final String MESSAGE = "message";
 
-    /** contentInput. */
-    public static final String CONTENT_INPUT = "contentInput";
-    /** contentOutput. */
-    public static final String CONTENT_OUTPUT = "contentOutput";
+    /** Parameter. */
+    public static final String PARAMETER = "Parameter";
+    /** Result. */
+    public static final String RESULT = "Result";
 
     private KnowledgeConstants() {}
 
