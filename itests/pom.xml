@@ -70,7 +70,7 @@
             <artifactId>switchyard-component-test-mixin-hornetq</artifactId>
             <scope>test</scope>
         </dependency>
-         <!-- external dependencies -->
+        <!-- external dependencies -->
         <dependency>
             <groupId>javax.jms</groupId>
             <artifactId>jms</artifactId>
