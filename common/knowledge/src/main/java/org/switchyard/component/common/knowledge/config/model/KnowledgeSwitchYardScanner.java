@@ -23,6 +23,7 @@ import org.switchyard.common.type.reflect.Construction;
 import org.switchyard.component.common.knowledge.LoggerType;
 import org.switchyard.component.common.knowledge.annotation.Channel;
 import org.switchyard.component.common.knowledge.annotation.Container;
+import org.switchyard.component.common.knowledge.annotation.Fault;
 import org.switchyard.component.common.knowledge.annotation.Global;
 import org.switchyard.component.common.knowledge.annotation.Input;
 import org.switchyard.component.common.knowledge.annotation.Listener;
@@ -34,6 +35,8 @@ import org.switchyard.component.common.knowledge.annotation.Resource;
 import org.switchyard.component.common.knowledge.config.model.v1.V1ChannelModel;
 import org.switchyard.component.common.knowledge.config.model.v1.V1ChannelsModel;
 import org.switchyard.component.common.knowledge.config.model.v1.V1ContainerModel;
+import org.switchyard.component.common.knowledge.config.model.v1.V1FaultModel;
+import org.switchyard.component.common.knowledge.config.model.v1.V1FaultsModel;
 import org.switchyard.component.common.knowledge.config.model.v1.V1GlobalModel;
 import org.switchyard.component.common.knowledge.config.model.v1.V1GlobalsModel;
 import org.switchyard.component.common.knowledge.config.model.v1.V1InputModel;
@@ -86,14 +89,14 @@ public abstract class KnowledgeSwitchYardScanner implements Scanner<SwitchYardMo
         ChannelsModel channelsModel = new V1ChannelsModel(namespace);
         for (Channel channelAnnotation : channelAnnotations) {
             ChannelModel channelModel = new V1ChannelModel(namespace);
-            Class<? extends org.kie.runtime.Channel> clazz = channelAnnotation.value();
+            Class<? extends org.kie.api.runtime.Channel> clazz = channelAnnotation.value();
             if (Channel.UndefinedChannel.class.isAssignableFrom(clazz)) {
                 clazz = SwitchYardServiceChannel.class;
             }
             channelModel.setClazz(clazz);
             String name = channelAnnotation.name();
             if (UNDEFINED.equals(name)) {
-                org.kie.runtime.Channel c = Construction.construct(clazz);
+                org.kie.api.runtime.Channel c = Construction.construct(clazz);
                 if (c instanceof SwitchYardServiceChannel) {
                     SwitchYardServiceChannel sysc = (SwitchYardServiceChannel)c;
                     if (sysc.getName() != null) {
@@ -318,6 +321,36 @@ public abstract class KnowledgeSwitchYardScanner implements Scanner<SwitchYardMo
             }
         }
         return outputsModel;
+    }
+
+    /**
+     * Converts faults to mappings model.
+     * @param faults faults
+     * @param namespace namespace
+     * @return mappings model
+     */
+    protected FaultsModel toFaultsModel(Fault[] faults, String namespace) {
+        FaultsModel faultsModel = null;
+        if (faults != null) {
+            for (Fault fault : faults) {
+                if (fault != null) {
+                    FaultModel faultModel = new V1FaultModel(namespace);
+                    String from = fault.from();
+                    if (!UNDEFINED.equals(from)) {
+                        faultModel.setFrom(from);
+                    }
+                    String to = fault.to();
+                    if (!UNDEFINED.equals(to)) {
+                        faultModel.setTo(to);
+                    }
+                    if (faultsModel == null) {
+                        faultsModel = new V1FaultsModel(namespace);
+                    }
+                    faultsModel.addFault(faultModel);
+                }
+            }
+        }
+        return faultsModel;
     }
 
     /**

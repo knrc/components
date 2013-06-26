@@ -32,12 +32,13 @@ import org.switchyard.component.bean.deploy.BeanDeploymentMetaData;
 import org.switchyard.component.bean.deploy.CDIBean;
 import org.switchyard.component.bean.deploy.ServiceDescriptor;
 import org.switchyard.deploy.Activator;
+import org.switchyard.deploy.Lifecycle;
 import org.switchyard.deploy.internal.AbstractDeployment;
 import org.switchyard.exception.SwitchYardException;
 import org.switchyard.metadata.ServiceInterface;
 import org.switchyard.transform.TransformerRegistry;
-import org.switchyard.transform.TransformerTypes;
-import org.switchyard.transform.TransformerUtil;
+import org.switchyard.transform.internal.TransformerTypes;
+import org.switchyard.transform.internal.TransformerUtil;
 
 /**
  * Simple CDI deployment.
@@ -124,5 +125,10 @@ public class SimpleCDIDeployment extends AbstractDeployment {
             handler.start();
 
         }
+    }
+
+    @Override
+    public Lifecycle getGatwayLifecycle(QName serviceName, String bindingName) {
+        return null;
     }
 }

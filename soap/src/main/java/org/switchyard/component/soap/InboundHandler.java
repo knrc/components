@@ -41,6 +41,7 @@ import org.switchyard.Exchange;
 import org.switchyard.ExchangeState;
 import org.switchyard.HandlerException;
 import org.switchyard.Message;
+import org.switchyard.Scope;
 import org.switchyard.ServiceDomain;
 import org.switchyard.ServiceReference;
 import org.switchyard.SynchronousInOutHandler;
@@ -56,6 +57,8 @@ import org.switchyard.component.soap.util.WSDLUtil;
 import org.switchyard.deploy.BaseServiceHandler;
 import org.switchyard.exception.DeliveryException;
 import org.switchyard.exception.SwitchYardException;
+import org.switchyard.label.BehaviorLabel;
+import org.switchyard.runtime.event.ExchangeCompletionEvent;
 import org.switchyard.security.SecurityContext;
 import org.w3c.dom.Node;
 
@@ -72,7 +75,7 @@ public class InboundHandler extends BaseServiceHandler {
     private static final String MESSAGE_NAME = "org.switchyard.soap.messageName";
 
     private final SOAPBindingModel _config;
-    
+    private final String _gatewayName;
     private MessageComposer<SOAPBindingData> _messageComposer;
     private ServiceDomain _domain;
     private ServiceReference _service;
@@ -81,6 +84,7 @@ public class InboundHandler extends BaseServiceHandler {
     private Port _wsdlPort;
     private String _bindingId;
     private Boolean _documentStyle = false;
+    private Boolean _unwrapped = false;
     private String _targetNamespace;
     private Feature _feature = new Feature();
     private Map<String, Operation> _operationsMap = new HashMap<String, Operation>();
@@ -91,7 +95,9 @@ public class InboundHandler extends BaseServiceHandler {
      * @param domain the service domain
      */
     public InboundHandler(final SOAPBindingModel config, ServiceDomain domain) {
+        super(domain);
         _config = config;
+        _gatewayName = config.getName();
         _domain = domain;
     }
 
@@ -99,7 +105,8 @@ public class InboundHandler extends BaseServiceHandler {
      * Start lifecycle.
      * @throws WebServicePublishException If unable to publish the endpoint
      */
-    public void start() throws WebServicePublishException {
+    @Override
+    protected void doStart() throws WebServicePublishException {
         try {
             _service = _domain.getServiceReference(_config.getServiceName());
             PortName portName = _config.getPort();
@@ -113,6 +120,7 @@ public class InboundHandler extends BaseServiceHandler {
 
             String style = WSDLUtil.getStyle(_wsdlPort);
             _documentStyle = style.equals(WSDLUtil.DOCUMENT) ? true : false;
+            _unwrapped = _config.isUnwrapped();
             _feature = WSDLUtil.getFeature(definition, _wsdlPort, _documentStyle);
 
             if (_feature.isAddressingEnabled()) {
@@ -138,6 +146,7 @@ public class InboundHandler extends BaseServiceHandler {
             ((SOAPMessageComposer)_messageComposer).setDocumentStyle(_documentStyle);
             ((SOAPMessageComposer)_messageComposer).setWsdlPort(_wsdlPort);
             ((SOAPMessageComposer)_messageComposer).setMtomEnabled(mtom.isEnabled());
+            ((SOAPMessageComposer)_messageComposer).setUnwrapped(_unwrapped);
             if (_config.getMtomConfig() != null) {
                 ((SOAPMessageComposer)_messageComposer).setXopExpand(_config.getMtomConfig().isXopExpand());
             }
@@ -149,7 +158,8 @@ public class InboundHandler extends BaseServiceHandler {
     /**
      * Stop lifecycle.
      */
-    public void stop() {
+    @Override
+    protected void doStop() {
         if (_endpoint != null) {
             _endpoint.stop();
         }
@@ -234,6 +244,10 @@ public class InboundHandler extends BaseServiceHandler {
             SynchronousInOutHandler inOutHandler = new SynchronousInOutHandler();
             Exchange exchange = _service.createExchange(operationName, inOutHandler);
 
+            // identify ourselves
+            exchange.getContext().setProperty(ExchangeCompletionEvent.GATEWAY_NAME, _gatewayName, Scope.EXCHANGE)
+                    .addLabels(BehaviorLabel.TRANSIENT.label());
+
             SOAPBindingData soapBindingData = new SOAPBindingData(soapMessage, wsContext);
             SecurityContext.get(exchange).getCredentials().addAll(soapBindingData.extractCredentials());
 
@@ -245,7 +259,7 @@ public class InboundHandler extends BaseServiceHandler {
             }
 
             // Do not perfom this check if the message has been unwrapped
-            if (_config.getSOAPMessageComposer() == null || !_config.getSOAPMessageComposer().isUnwrapped()) {
+            if (!_unwrapped) {
                 assertComposedMessageOK(message, operation);
             }
 

@@ -21,8 +21,20 @@ MA  02110-1301, USA.
     <composite xmlns="http://docs.oasis-open.org/ns/opencsa/sca/200912" name="RulesModelTests" targetNamespace="urn:rules:test:1.0">
         <component name="DoStuffRules">
             <implementation.rules xmlns="urn:switchyard-component-rules:config:1.0">
-                <actions>
-                    <action eventId="theEventId" operation="process" type="FIRE_UNTIL_HALT">
+                <channels>
+                    <channel class="org.switchyard.component.rules.config.model.RulesModelTests$TestChannel" name="theName" operation="theOperation" reference="theReference"/>
+                </channels>
+                <listeners>
+                    <listener class="org.kie.api.event.rule.DebugWorkingMemoryEventListener"/>
+                </listeners>
+                <loggers>
+                    <logger interval="2000" log="theLog" type="CONSOLE"/>
+                </loggers>
+                <manifest>
+                    <container baseName="theBase" releaseId="theGroupId:theArtifactId:theVersion" scan="true" scanInterval="1000" sessionName="theSession"/>
+                </manifest>
+                <operations>
+                    <operation eventId="theEventId" name="process" type="FIRE_UNTIL_HALT">
                         <globals>
                             <global from="context['foobar']" to="globalVar"/>
                         </globals>
@@ -32,20 +44,11 @@ MA  02110-1301, USA.
                         <outputs>
                             <output from="outputVar" to="message.content"/>
                         </outputs>
-                    </action>
-                </actions>
-                <channels>
-                    <channel class="org.switchyard.component.rules.config.model.RulesModelTests$TestChannel" name="theName" operation="theOperation" reference="theReference"/>
-                </channels>
-                <listeners>
-                    <listener class="org.kie.event.rule.DebugWorkingMemoryEventListener"/>
-                </listeners>
-                <loggers>
-                    <logger interval="2000" log="theLog" type="CONSOLE"/>
-                </loggers>
-                <manifest>
-                    <container baseName="theBase" releaseId="theGroupId:theArtifactId:theVersion" scan="true" scanInterval="1000" sessionName="theSession"/>
-                </manifest>
+                        <faults>
+                            <fault from="faultVar" to="message.content"/>
+                        </faults>
+                    </operation>
+                </operations>
                 <properties>
                     <property name="foo" value="bar"/>
                 </properties>

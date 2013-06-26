@@ -18,18 +18,15 @@
  */
 package org.switchyard.component.bpm.service;
 
-import static org.switchyard.component.common.knowledge.KnowledgeConstants.PARAMETER;
-import static org.switchyard.component.common.knowledge.KnowledgeConstants.RESULT;
-
 import java.util.Map;
 
 import javax.xml.namespace.QName;
 
 import org.jbpm.process.workitem.bpmn2.ServiceTaskHandler;
-import org.kie.runtime.StatefulKnowledgeSession;
-import org.kie.runtime.process.ProcessRuntime;
-import org.kie.runtime.process.WorkItem;
-import org.kie.runtime.process.WorkItemManager;
+import org.kie.api.runtime.KieSession;
+import org.kie.api.runtime.process.ProcessRuntime;
+import org.kie.api.runtime.process.WorkItem;
+import org.kie.api.runtime.process.WorkItemManager;
 
 /**
  * StandardSwitchYardServiceTaskHandler.
@@ -71,8 +68,8 @@ public class StandardSwitchYardServiceTaskHandler extends SwitchYardServiceTaskH
         } else {
             ServiceTaskHandler sth;
             ProcessRuntime runtime = getProcessRuntime();
-            if (runtime instanceof StatefulKnowledgeSession) {
-                sth = new ServiceTaskHandler((StatefulKnowledgeSession)runtime);
+            if (runtime instanceof KieSession) {
+                sth = new ServiceTaskHandler((KieSession)runtime);
             } else {
                 sth = new ServiceTaskHandler();
             }
@@ -99,22 +96,6 @@ public class StandardSwitchYardServiceTaskHandler extends SwitchYardServiceTaskH
     @Override
     protected String getOperationName(Map<String, Object> parameters) {
         return getString(OPERATION, parameters, getString(OPERATION_IMPLEMENTATION_REF, parameters, null));
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    protected String getParameterName(Map<String, Object> parameters) {
-        return PARAMETER;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    protected String getResultName(Map<String, Object> parameters) {
-        return RESULT;
     }
 
 }

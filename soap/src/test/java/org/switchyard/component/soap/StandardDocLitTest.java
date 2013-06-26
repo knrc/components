@@ -41,7 +41,9 @@ import org.switchyard.component.soap.config.model.SOAPBindingModel;
 import org.switchyard.component.soap.config.model.v1.V1SOAPBindingModel;
 import org.switchyard.config.model.ModelPuller;
 import org.switchyard.config.model.composite.CompositeModel;
+import org.switchyard.config.model.composite.CompositeReferenceModel;
 import org.switchyard.config.model.composite.CompositeServiceModel;
+import org.switchyard.config.model.composite.v1.V1CompositeReferenceModel;
 import org.switchyard.deploy.ServiceDomainManager;
 import org.switchyard.metadata.BaseService;
 import org.switchyard.metadata.InOutOperation;
@@ -99,9 +101,15 @@ public class StandardDocLitTest {
         _serviceURL = new URL("http://" + host + ":" + port + "/OrderService");
 
         // A WS Consumer as Service
-        SOAPBindingModel config2 = new V1SOAPBindingModel();
+        SOAPBindingModel config2 = new V1SOAPBindingModel() {
+            @Override
+            public CompositeReferenceModel getReference() {
+                return new V1CompositeReferenceModel();
+            }
+        };
         config2.setWsdl(_serviceURL.toExternalForm() + "?wsdl");
         config2.setServiceName(consumerService.getServiceName());
+        config2.setName("testGateway");
         _soapOutbound = new OutboundHandler(config2);
         _soapOutbound.start();
         _domain.registerService(consumerService.getServiceName(), new OrderServiceInterface(), _soapOutbound);

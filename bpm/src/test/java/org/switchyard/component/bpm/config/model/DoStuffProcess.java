@@ -18,12 +18,14 @@
  */
 package org.switchyard.component.bpm.config.model;
 
-import org.drools.event.DebugProcessEventListener;
+import org.drools.core.event.DebugProcessEventListener;
 import org.switchyard.component.bpm.annotation.BPM;
 import org.switchyard.component.bpm.annotation.SignalEvent;
+import org.switchyard.component.bpm.annotation.UserGroupCallback;
 import org.switchyard.component.bpm.annotation.WorkItemHandler;
 import org.switchyard.component.common.knowledge.LoggerType;
 import org.switchyard.component.common.knowledge.annotation.Channel;
+import org.switchyard.component.common.knowledge.annotation.Fault;
 import org.switchyard.component.common.knowledge.annotation.Global;
 import org.switchyard.component.common.knowledge.annotation.Input;
 import org.switchyard.component.common.knowledge.annotation.Listener;
@@ -48,6 +50,9 @@ import org.switchyard.component.common.knowledge.annotation.Resource;
             @Resource(location="foobar.bpmn", type="BPMN2")
         }),
     properties=@Property(name="foo", value="bar"),
+    userGroupCallback=@UserGroupCallback(
+        value=BPMModelTests.TestUserGroupCallback.class,
+        properties=@Property(name="rab", value="oof")),
     workItemHandlers=@WorkItemHandler(name="MyWIH", value=BPMModelTests.TestWorkItemHandler.class)
 )
 public interface DoStuffProcess extends DoStuff {
@@ -57,7 +62,8 @@ public interface DoStuffProcess extends DoStuff {
         eventId="theEventId",
         globals=@Global(from="context['foobar']", to="globalVar"),
         inputs=@Input(from="message.content.nested", to="inputVar"),
-        outputs=@Output(from="outputVar", to="message.content")
+        outputs=@Output(from="outputVar", to="message.content"),
+        faults=@Fault(from="faultVar", to="message.content")
     )
     public void process(Object stuff);
 

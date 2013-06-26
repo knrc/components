@@ -26,24 +26,30 @@ import org.switchyard.ExchangePattern;
 import org.switchyard.ExchangeState;
 import org.switchyard.HandlerException;
 import org.switchyard.Message;
+import org.switchyard.Scope;
 import org.switchyard.ServiceReference;
 import org.switchyard.SynchronousInOutHandler;
 import org.switchyard.config.model.composite.SCABindingModel;
 import org.switchyard.deploy.BaseServiceHandler;
+import org.switchyard.deploy.Lifecycle.State;
 import org.switchyard.exception.SwitchYardException;
+import org.switchyard.label.BehaviorLabel;
 import org.switchyard.remote.RemoteMessage;
 import org.switchyard.remote.RemoteRegistry;
 import org.switchyard.remote.cluster.ClusteredInvoker;
 import org.switchyard.remote.cluster.LoadBalanceStrategy;
 import org.switchyard.remote.cluster.RandomStrategy;
 import org.switchyard.remote.cluster.RoundRobinStrategy;
+import org.switchyard.runtime.event.ExchangeCompletionEvent;
 
 /**
  * Handles outbound communication to an SCA service endpoint.
  */
 public class SCAInvoker extends BaseServiceHandler {
     
-    private SCABindingModel _config;
+    private final SCABindingModel _config;
+    private final String _bindingName;
+    private final String _referenceName;
     private ClusteredInvoker _invoker;
     
     /**
@@ -52,6 +58,8 @@ public class SCAInvoker extends BaseServiceHandler {
      */
     public SCAInvoker(SCABindingModel config) {
         _config = config;
+        _bindingName = config.getName();
+        _referenceName = config.getReference().getName();
     }
     
     /**
@@ -60,7 +68,7 @@ public class SCAInvoker extends BaseServiceHandler {
      * @param registry registry of remote services
      */
     public SCAInvoker(SCABindingModel config, RemoteRegistry registry) {
-        _config = config;
+        this(config);
         if (config.isLoadBalanced()) {
             LoadBalanceStrategy loadBalancer = createLoadBalancer(config.getLoadBalance());
             _invoker = new ClusteredInvoker(registry, loadBalancer);
@@ -71,6 +79,14 @@ public class SCAInvoker extends BaseServiceHandler {
     
     @Override
     public void handleMessage(Exchange exchange) throws HandlerException {
+        // identify ourselves
+        exchange.getContext().setProperty(ExchangeCompletionEvent.GATEWAY_NAME, _bindingName, Scope.EXCHANGE)
+                .addLabels(BehaviorLabel.TRANSIENT.label());
+
+        if (getState() != State.STARTED) {
+            throw new HandlerException(String.format("Reference binding \"%s/%s\" is not started.", _referenceName,
+                    _bindingName));
+        }
         try {
             if (_config.isClustered()) {
                 invokeRemote(exchange);
