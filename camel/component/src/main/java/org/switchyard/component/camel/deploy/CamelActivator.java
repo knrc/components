@@ -1,22 +1,15 @@
 /*
- * JBoss, Home of Professional Open Source Copyright 2009, Red Hat Middleware
- * LLC, and individual contributors by the @authors tag. See the copyright.txt
- * in the distribution for a full listing of individual contributors.
- * 
- * This is free software; you can redistribute it and/or modify it under the
- * terms of the GNU Lesser General Public License as published by the Free
- * Software Foundation; either version 2.1 of the License, or (at your option)
- * any later version.
- * 
- * This software is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
- * FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more
- * details.
- * 
- * You should have received a copy of the GNU Lesser General Public License
- * along with this software; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA, or see the FSF
- * site: http://www.fsf.org.
+ * Copyright 2013 Red Hat Inc. and/or its affiliates and other contributors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,  
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package org.switchyard.component.camel.deploy;
 
@@ -31,6 +24,7 @@ import org.apache.camel.model.ProcessorDefinition;
 import org.apache.camel.model.RouteDefinition;
 import org.apache.camel.model.ToDefinition;
 import org.switchyard.ServiceReference;
+import org.switchyard.SwitchYardException;
 import org.switchyard.common.camel.SwitchYardCamelContext;
 import org.switchyard.common.property.PropertyResolver;
 import org.switchyard.component.camel.ComponentNameComposer;
@@ -39,15 +33,14 @@ import org.switchyard.component.camel.SwitchYardConsumer;
 import org.switchyard.component.camel.SwitchYardEndpoint;
 import org.switchyard.component.camel.SwitchYardPropertiesParser;
 import org.switchyard.component.camel.common.CamelConstants;
-import org.switchyard.component.camel.common.SwitchYardRouteDefinition;
 import org.switchyard.component.camel.common.composer.CamelComposition;
 import org.switchyard.component.camel.common.deploy.BaseCamelActivator;
 import org.switchyard.component.camel.model.CamelComponentImplementationModel;
 import org.switchyard.config.model.composite.ComponentModel;
 import org.switchyard.config.model.composite.ComponentReferenceModel;
 import org.switchyard.config.model.composite.ComponentServiceModel;
+import org.switchyard.deploy.ComponentNames;
 import org.switchyard.deploy.ServiceHandler;
-import org.switchyard.exception.SwitchYardException;
 
 /**
  * Activates Camel bindings, references and implementations in SwitchYard. 
@@ -97,42 +90,16 @@ public class CamelActivator extends BaseCamelActivator {
         try {
             final String endpointUri = ComponentNameComposer.composeComponentUri(serviceName);
             final List<RouteDefinition> routeDefinitions = getRouteDefinition(ccim);
-            checkSwitchYardReferencedServiceExist(routeDefinitions, ccim);
             verifyRouteDefinitions(routeDefinitions, ccim);
             getCamelContext().addRouteDefinitions(routeDefinitions);
             final SwitchYardEndpoint endpoint = getCamelContext().getEndpoint(endpointUri, SwitchYardEndpoint.class);
             endpoint.setMessageComposer(CamelComposition.getMessageComposer());
             final SwitchYardConsumer consumer = endpoint.getConsumer();
+            consumer.setComponentName(config.getComponent().getQName());
+            consumer.setNamespace(serviceName.getNamespaceURI());
             return consumer;
         } catch (final Exception e) {
             throw new SwitchYardException(e.getMessage(), e);
-        }
-    }
-
-    private void checkSwitchYardReferencedServiceExist(List<RouteDefinition> routeDefinitions, CamelComponentImplementationModel ccim) {
-        for (RouteDefinition routeDefinition : routeDefinitions) {
-            final List<ProcessorDefinition<?>> outputs = routeDefinition.getOutputs();
-            for (ProcessorDefinition<?> processorDef : outputs) {
-                if (processorDef instanceof ToDefinition) {
-                    final ToDefinition to = (ToDefinition) processorDef;
-                    final URI componentUri = URI.create(to.getUri());
-                    if (componentUri.getScheme().equals(CamelConstants.SWITCHYARD_COMPONENT_NAME)) {
-                        final String serviceName = componentUri.getHost();
-                        final String namespace = ComponentNameComposer.getNamespaceFromURI(componentUri);
-                        final QName refServiceName = new QName(namespace, serviceName);
-                        if (!containsServiceRef(ccim.getComponent().getReferences(), serviceName)) {
-                            throw new SwitchYardException("Could not find the service reference for '" + serviceName + "'" 
-                            + " which is referenced in " + to);
-                        }
-                        
-                        final ServiceReference service = getServiceDomain().getServiceReference(refServiceName);
-                        if (service == null) {
-                            throw new SwitchYardException("Could not find the service name '" + serviceName + "'" 
-                            + " which is referenced in " + to);
-                        }
-                    }
-                }
-            }
         }
     }
 
@@ -164,10 +131,9 @@ public class CamelActivator extends BaseCamelActivator {
                         throw new SwitchYardException("Only one switchyard input per implementation is allowed");
                     }
                     String host = from.getHost();
-                    String namespace = ComponentNameComposer.getNamespaceFromURI(from);
 
-                    if (!serviceName.equals(host) || !compositeNs.equals(namespace)) {
-                        throw new SwitchYardException("The implementation consumer doesn't match expected service " + serviceName + " and namespace " + namespace);
+                    if (!serviceName.equals(host)) {
+                        throw new SwitchYardException("The implementation consumer doesn't match expected service " + serviceName);
                     }
                     serviceConsumer++;
                 }
@@ -180,16 +146,17 @@ public class CamelActivator extends BaseCamelActivator {
                     final URI componentUri = URI.create(to.getUri());
                     if (componentUri.getScheme().equals(CamelConstants.SWITCHYARD_COMPONENT_NAME)) {
                         final String referenceName = componentUri.getHost();
-                        final String namespace = ComponentNameComposer.getNamespaceFromURI(componentUri);
-                        final QName refServiceName = new QName(namespace, referenceName);
+                        final QName refServiceName = new QName(compositeNs, referenceName);
                         if (!containsServiceRef(ccim.getComponent().getReferences(), referenceName)) {
                             throw new SwitchYardException("Could not find the service reference for '" + referenceName + "'" 
                             + " which is referenced in " + to);
                         }
                         
-                        final ServiceReference service = getServiceDomain().getServiceReference(refServiceName);
+                        QName qualifiedRefName = ComponentNames.qualify(
+                                ccim.getComponent().getQName(), refServiceName);
+                        final ServiceReference service = getServiceDomain().getServiceReference(qualifiedRefName);
                         if (service == null) {
-                            throw new SwitchYardException("Could not find the service name '" + referenceName + "'" 
+                            throw new SwitchYardException("Could not find the service name '" + qualifiedRefName + "'" 
                             + " which is referenced in " + to);
                         }
                     }
@@ -209,9 +176,6 @@ public class CamelActivator extends BaseCamelActivator {
      */
     private List<RouteDefinition> getRouteDefinition(CamelComponentImplementationModel model) {
         List<RouteDefinition> routes = RouteFactory.getRoutes(model);
-        for (RouteDefinition route : routes) {
-            SwitchYardRouteDefinition.addNamespaceParameter(route, model.getComponent().getTargetNamespace());
-        }
         return routes;
     }
 

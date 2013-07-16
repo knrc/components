@@ -1,20 +1,15 @@
-/* 
- * JBoss, Home of Professional Open Source 
- * Copyright 2012 Red Hat Inc. and/or its affiliates and other contributors
- * as indicated by the @author tags. All rights reserved. 
- * See the copyright.txt in the distribution for a 
- * full listing of individual contributors.
+/*
+ * Copyright 2013 Red Hat Inc. and/or its affiliates and other contributors.
  *
- * This copyrighted material is made available to anyone wishing to use, 
- * modify, copy, or redistribute it subject to the terms and conditions 
- * of the GNU Lesser General Public License, v. 2.1. 
- * This program is distributed in the hope that it will be useful, but WITHOUT A 
- * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A 
- * PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more details. 
- * You should have received a copy of the GNU Lesser General Public License, 
- * v.2.1 along with this distribution; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, 
- * MA  02110-1301, USA.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,  
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
  
 package org.switchyard.component.sca;
@@ -35,10 +30,10 @@ import org.switchyard.ExchangeState;
 import org.switchyard.Message;
 import org.switchyard.ServiceDomain;
 import org.switchyard.ServiceReference;
-import org.switchyard.SynchronousInOutHandler;
+import org.switchyard.SwitchYardException;
 import org.switchyard.common.type.Classes;
+import org.switchyard.component.common.SynchronousInOutHandler;
 import org.switchyard.deploy.internal.Deployment;
-import org.switchyard.exception.SwitchYardException;
 import org.switchyard.remote.RemoteMessage;
 import org.switchyard.remote.http.HttpInvoker;
 import org.switchyard.serial.FormatType;
@@ -66,7 +61,7 @@ public class SwitchYardRemotingServlet extends HttpServlet {
             // Grab the right service domain based on the service header
             ServiceDomain domain = findDomain(request);
             // Set our TCCL to the domain's deployment loader
-            ClassLoader loader = (ClassLoader) domain.getProperties().get(Deployment.CLASSLOADER_PROPERTY);
+            ClassLoader loader = (ClassLoader) domain.getProperty(Deployment.CLASSLOADER_PROPERTY);
             setTCCL = Classes.setTCCL(loader);
             
             RemoteMessage msg = _serializer.deserialize(request.getInputStream(), RemoteMessage.class);
@@ -89,22 +84,30 @@ public class SwitchYardRemotingServlet extends HttpServlet {
                 _log.debug("Invoking service " + msg.getService());
             }
             ex.send(m);
-            // check if a reply is expected
-            if (ex.getContract().getProviderOperation().getExchangePattern().equals(ExchangePattern.IN_OUT)) {
+            
+            // handle reply or fault
+            RemoteMessage reply = null;
+            if (ExchangePattern.IN_OUT.equals(ex.getPattern())) {
                 replyHandler.waitForOut();
-                RemoteMessage reply = createReplyMessage(ex);
+                reply = createReplyMessage(ex);
+            } else if (ExchangeState.FAULT.equals(ex.getState())) {
+                // Even though this is in-only, we need to report a runtime fault on send
+                reply = createReplyMessage(ex);
+            }
+            
+            // If there's a reply, send it back
+            if (reply != null) {
                 OutputStream out = response.getOutputStream();
-                
                 if (_log.isDebugEnabled()) {
                     _log.debug("Writing reply message to HTTP response stream " + msg.getService());
                 }
                 _serializer.serialize(reply, RemoteMessage.class, out);
                 out.flush();
             } else {
+                response.setStatus(HttpServletResponse.SC_NO_CONTENT);
                 if (_log.isDebugEnabled()) {
                     _log.debug("No content to return for invocation of " + msg.getService());
                 }
-                response.setStatus(HttpServletResponse.SC_NO_CONTENT);
             }
         } catch (SwitchYardException syEx) {
             if (_log.isDebugEnabled()) {
@@ -151,7 +154,7 @@ public class SwitchYardRemotingServlet extends HttpServlet {
         reply.setDomain(exchange.getProvider().getDomain().getName())
             .setOperation(exchange.getContract().getConsumerOperation().getName())
             .setService(exchange.getConsumer().getName());
-        reply.setContext(exchange.getContext());
+        exchange.getContext().mergeInto(reply.getContext());
 
         if (exchange.getMessage() != null) {
             reply.setContent(exchange.getMessage().getContent());

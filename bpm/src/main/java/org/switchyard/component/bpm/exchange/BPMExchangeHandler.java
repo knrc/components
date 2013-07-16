@@ -1,20 +1,15 @@
-/* 
- * JBoss, Home of Professional Open Source 
- * Copyright 2012 Red Hat Inc. and/or its affiliates and other contributors
- * as indicated by the @author tags. All rights reserved. 
- * See the copyright.txt in the distribution for a 
- * full listing of individual contributors.
+/*
+ * Copyright 2013 Red Hat Inc. and/or its affiliates and other contributors.
  *
- * This copyrighted material is made available to anyone wishing to use, 
- * modify, copy, or redistribute it subject to the terms and conditions 
- * of the GNU Lesser General Public License, v. 2.1. 
- * This program is distributed in the hope that it will be useful, but WITHOUT A 
- * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A 
- * PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more details. 
- * You should have received a copy of the GNU Lesser General Public License, 
- * v.2.1 along with this distribution; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, 
- * MA  02110-1301, USA.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,  
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package org.switchyard.component.bpm.exchange;
 
@@ -54,8 +49,8 @@ import org.switchyard.HandlerException;
 import org.switchyard.Message;
 import org.switchyard.ServiceDomain;
 import org.switchyard.common.lang.Strings;
-import org.switchyard.component.bpm.BPMOperationType;
 import org.switchyard.component.bpm.BPMConstants;
+import org.switchyard.component.bpm.BPMOperationType;
 import org.switchyard.component.bpm.config.model.BPMComponentImplementationModel;
 import org.switchyard.component.bpm.runtime.BPMProcessEventListener;
 import org.switchyard.component.bpm.runtime.BPMRuntimeManager;
@@ -64,8 +59,8 @@ import org.switchyard.component.bpm.runtime.BPMTaskServiceRegistry;
 import org.switchyard.component.bpm.transaction.AS7TransactionHelper;
 import org.switchyard.component.bpm.util.UserGroupCallbacks;
 import org.switchyard.component.bpm.util.WorkItemHandlers;
-import org.switchyard.component.common.knowledge.exchange.KnowledgeOperation;
 import org.switchyard.component.common.knowledge.exchange.KnowledgeExchangeHandler;
+import org.switchyard.component.common.knowledge.exchange.KnowledgeOperation;
 import org.switchyard.component.common.knowledge.session.KnowledgeSession;
 import org.switchyard.component.common.knowledge.util.Disposals;
 import org.switchyard.component.common.knowledge.util.Environments;
@@ -198,12 +193,12 @@ public class BPMExchangeHandler extends KnowledgeExchangeHandler<BPMComponentImp
             case START_PROCESS: {
                 try {
                     utx.begin();
-                    KnowledgeSession session = getBPMSession(exchange);
+                    KnowledgeSession session = getBPMSession(exchange, inputMessage);
                     sessionId = session.getId();
                     setGlobals(inputMessage, operation, session);
                     Map<String, Object> inputMap = getInputMap(inputMessage, operation);
                     ProcessInstance processInstance;
-                    CorrelationKey correlationKey = getCorrelationKey(exchange);
+                    CorrelationKey correlationKey = getCorrelationKey(exchange, inputMessage);
                     if (correlationKey != null) {
                         processInstance = ((CorrelationAwareProcessRuntime)session.getStateful()).startProcess(_processId, correlationKey, inputMap);
                     } else {
@@ -221,24 +216,27 @@ public class BPMExchangeHandler extends KnowledgeExchangeHandler<BPMComponentImp
                 }
                 break;
             }
-            case SIGNAL_EVENT: {
+            case SIGNAL_EVENT:
+            case SIGNAL_EVENT_ALL: {
                 try {
                     utx.begin();
-                    KnowledgeSession session = getBPMSession(exchange);
+                    KnowledgeSession session = getBPMSession(exchange, inputMessage);
                     sessionId = session.getId();
                     setGlobals(inputMessage, operation, session);
-                    processInstanceId = getProcessInstanceId(exchange, session);
                     Object eventObject = getInput(inputMessage, operation);
                     String eventId = operation.getEventId();
-                    if (processInstanceId != null) {
+                    if (BPMOperationType.SIGNAL_EVENT.equals(operationType)) {
+                        processInstanceId = getProcessInstanceId(exchange, inputMessage, session);
+                        if (processInstanceId == null) {
+                            throw new HandlerException("Cannot signalEvent: unknown processInstanceId or unknown/unmatched correlationKey");
+                        }
                         session.getStateful().signalEvent(eventId, eventObject, processInstanceId);
                         if (ExchangePattern.IN_OUT.equals(exchangePattern)) {
                             expressionContext.putAll(getGlobalVariables(session));
                             ProcessInstance processInstance = session.getStateful().getProcessInstance(processInstanceId);
                             expressionContext.putAll(getProcessInstanceVariables(processInstance));
                         }
-                    } else {
-                        // TODO: should we really be defaulting here to signaling all process instances?
+                    } else if (BPMOperationType.SIGNAL_EVENT_ALL.equals(operationType)) {
                         session.getStateful().signalEvent(eventId, eventObject);
                         if (ExchangePattern.IN_OUT.equals(exchangePattern)) {
                             expressionContext.putAll(getGlobalVariables(session));
@@ -254,9 +252,12 @@ public class BPMExchangeHandler extends KnowledgeExchangeHandler<BPMComponentImp
             case ABORT_PROCESS_INSTANCE: {
                 try {
                     utx.begin();
-                    KnowledgeSession session = getBPMSession(exchange);
+                    KnowledgeSession session = getBPMSession(exchange, inputMessage);
                     sessionId = session.getId();
-                    processInstanceId = getProcessInstanceId(exchange, session);
+                    processInstanceId = getProcessInstanceId(exchange, inputMessage, session);
+                    if (processInstanceId == null) {
+                        throw new HandlerException("Cannot abortProcessInstance: unknown processInstanceId or unknown/unmatched correlationKey");
+                    }
                     if (ExchangePattern.IN_OUT.equals(exchangePattern)) {
                         expressionContext.putAll(getGlobalVariables(session));
                         ProcessInstance processInstance = session.getStateful().getProcessInstance(processInstanceId);
@@ -293,11 +294,10 @@ public class BPMExchangeHandler extends KnowledgeExchangeHandler<BPMComponentImp
         }
     }
 
-    private KnowledgeSession getBPMSession(Exchange exchange) {
+    private KnowledgeSession getBPMSession(Exchange exchange, Message message) {
         KnowledgeSession session;
         if (_persistent) {
-            Integer sessionId = getInteger(exchange, BPMConstants.SESSION_ID_PROPERTY);
-            session = getPersistentSession(sessionId);
+            session = getPersistentSession(getSessionId(exchange, message));
         } else {
             session = getStatefulSession();
         }
@@ -307,29 +307,41 @@ public class BPMExchangeHandler extends KnowledgeExchangeHandler<BPMComponentImp
         return session;
     }
 
-    private Long getProcessInstanceId(Exchange exchange, KnowledgeSession session) {
-        Long processInstanceId = getLong(exchange, BPMConstants.PROCESSS_INSTANCE_ID_PROPERTY);
+    private CorrelationKey getCorrelationKey(Exchange exchange, Message message) {
+        String ckp = getString(exchange, message, BPMConstants.CORRELATION_KEY_PROPERTY);
+        if (ckp != null) {
+            List<String> properties = Strings.splitTrimToNull(ckp, " \t\n\r\f");
+            if (properties.size() > 0) {
+                return _correlationKeyFactory.newCorrelationKey(properties);
+            }
+        }
+        return null;
+    }
+
+    private Integer getSessionId(Exchange exchange, Message message) {
+        return getInteger(exchange, message, BPMConstants.SESSION_ID_PROPERTY);
+    }
+
+    private Long getProcessInstanceId(Exchange exchange, Message message) {
+        return getLong(exchange, message, BPMConstants.PROCESSS_INSTANCE_ID_PROPERTY);
+    }
+
+    private Long getProcessInstanceId(Exchange exchange, Message message, KnowledgeSession session) {
+        Long processInstanceId = getProcessInstanceId(exchange, message);
         if (processInstanceId == null) {
-            CorrelationKey correlationKey = getCorrelationKey(exchange);
+            CorrelationKey correlationKey = getCorrelationKey(exchange, message);
             if (correlationKey != null) {
-                ProcessInstance processInstance = ((CorrelationAwareProcessRuntime)session.getStateful()).getProcessInstance(correlationKey);
-                if (processInstance != null) {
-                    long pid = processInstance.getId();
-                    if (pid > 0) {
-                        processInstanceId = Long.valueOf(pid);
-                    }
-                }
+                processInstanceId = getProcessInstanceId(correlationKey, session);
             }
         }
         return processInstanceId;
     }
 
-    private CorrelationKey getCorrelationKey(Exchange exchange) {
-        String ckp = getString(exchange, BPMConstants.CORRELATION_KEY_PROPERTY);
-        if (ckp != null) {
-            List<String> properties = Strings.splitTrimToNull(ckp, " \t\n\r\f");
-            if (properties.size() > 0) {
-                return  _correlationKeyFactory.newCorrelationKey(properties);
+    private Long getProcessInstanceId(CorrelationKey correlationKey, KnowledgeSession session) {
+        if (correlationKey != null) {
+            ProcessInstance processInstance = ((CorrelationAwareProcessRuntime)session.getStateful()).getProcessInstance(correlationKey);
+            if (processInstance != null) {
+                return Long.valueOf(processInstance.getId());
             }
         }
         return null;

@@ -1,22 +1,15 @@
 /*
- * JBoss, Home of Professional Open Source Copyright 2009, Red Hat Middleware
- * LLC, and individual contributors by the @authors tag. See the copyright.txt
- * in the distribution for a full listing of individual contributors.
- * 
- * This is free software; you can redistribute it and/or modify it under the
- * terms of the GNU Lesser General Public License as published by the Free
- * Software Foundation; either version 2.1 of the License, or (at your option)
- * any later version.
- * 
- * This software is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
- * FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more
- * details.
- * 
- * You should have received a copy of the GNU Lesser General Public License
- * along with this software; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA, or see the FSF
- * site: http://www.fsf.org.
+ * Copyright 2013 Red Hat Inc. and/or its affiliates and other contributors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,  
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package org.switchyard.component.camel.common.handler;
 
@@ -28,13 +21,12 @@ import org.apache.camel.model.RouteDefinition;
 import org.apache.log4j.Logger;
 import org.switchyard.Exchange;
 import org.switchyard.ServiceDomain;
+import org.switchyard.SwitchYardException;
 import org.switchyard.common.camel.SwitchYardCamelContext;
 import org.switchyard.component.camel.common.CamelConstants;
-import org.switchyard.component.camel.common.SwitchYardRouteDefinition;
 import org.switchyard.component.camel.common.model.CamelBindingModel;
 import org.switchyard.component.camel.common.transaction.TransactionHelper;
 import org.switchyard.deploy.BaseServiceHandler;
-import org.switchyard.exception.SwitchYardException;
 import org.switchyard.runtime.event.ExchangeCompletionEvent;
 
 /**
@@ -84,10 +76,11 @@ public class InboundHandler<T extends CamelBindingModel> extends BaseServiceHand
      * @return Route definition handling given binding.
      */
     protected RouteDefinition createRouteDefinition() {
-        final SwitchYardRouteDefinition route = new SwitchYardRouteDefinition(getServiceName());
+        final RouteDefinition route = new RouteDefinition();
 
         route.routeId(getRouteId()).from(getComponentUri().toString())
             .setProperty(ExchangeCompletionEvent.GATEWAY_NAME).simple(getBindingModel().getName(), String.class)
+            .setProperty(CamelConstants.APPLICATION_NAMESPACE).constant(_serviceName.getNamespaceURI())
             .process(new MessageComposerProcessor(getBindingModel()))
             .process(new OperationSelectorProcessor(getServiceName(), getBindingModel()));
         return addTransactionPolicy(route);
@@ -117,7 +110,7 @@ public class InboundHandler<T extends CamelBindingModel> extends BaseServiceHand
      * @param componentURI Component uri.
      * @return 
      */
-    protected RouteDefinition addTransactionPolicy(final SwitchYardRouteDefinition route) {
+    protected RouteDefinition addTransactionPolicy(final RouteDefinition route) {
         if (!TransactionHelper.useTransactionManager(getComponentUri(), _camelContext)) {
             // namespace will be added by SwitchYardRouteDefinition
             return route.to(getSwitchyardEndpointUri());
@@ -125,9 +118,7 @@ public class InboundHandler<T extends CamelBindingModel> extends BaseServiceHand
 
         // Tell Camel the route is transacted
         route.transacted(CamelConstants.TRANSACTED_REF).to(getSwitchyardEndpointUri());
-        // as we have 'transacted' element we need to process route outputs and
-        // put namespace attribute for switchyard:// endpoint
-        SwitchYardRouteDefinition.addNamespaceParameter(route, getServiceName().getNamespaceURI());
+        
         return route;
     }
 

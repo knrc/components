@@ -1,19 +1,15 @@
 /*
- * JBoss, Home of Professional Open Source
- * Copyright 2009-11, Red Hat Middleware LLC, and others contributors as indicated
- * by the @authors tag. All rights reserved.
- * See the copyright.txt in the distribution for a
- * full listing of individual contributors.
- * This copyrighted material is made available to anyone wishing to use,
- * modify, copy, or redistribute it subject to the terms and conditions
- * of the GNU Lesser General Public License, v. 2.1.
- * This program is distributed in the hope that it will be useful, but WITHOUT A
- * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
- * PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more details.
- * You should have received a copy of the GNU Lesser General Public License,
- * v.2.1 along with this distribution; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- * MA  02110-1301, USA.
+ * Copyright 2013 Red Hat Inc. and/or its affiliates and other contributors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,  
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package org.switchyard.component.bpel.riftsaw;
 
@@ -35,13 +31,14 @@ import org.switchyard.Message;
 import org.switchyard.Scope;
 import org.switchyard.ServiceDomain;
 import org.switchyard.ServiceReference;
-import org.switchyard.SynchronousInOutHandler;
 import org.switchyard.component.bpel.BPELFault;
 import org.switchyard.config.model.implementation.bpel.BPELComponentImplementationModel;
+import org.switchyard.component.common.DeliveryException;
+import org.switchyard.component.common.SynchronousInOutHandler;
 import org.switchyard.component.common.label.EndpointLabel;
 import org.switchyard.config.model.composite.ComponentReferenceModel;
-import org.switchyard.exception.DeliveryException;
-import org.switchyard.exception.SwitchYardException;
+import org.switchyard.deploy.ComponentNames;
+import org.switchyard.SwitchYardException;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 
@@ -156,7 +153,7 @@ public class RiftsawServiceLocator implements ServiceLocator {
             javax.wsdl.Definition wsdl=WSDLHelper.getWSDLDefinition(crm.getInterface().getInterface());
             javax.wsdl.PortType portType=WSDLHelper.getPortType(crm.getInterface().getInterface(), wsdl);
             
-            re.register(portType, crm.getQName());
+            re.register(portType, crm.getQName(), crm.getComponent().getQName());
 
         } else {
             throw new SwitchYardException("Could not find BPEL implementation associated with reference");
@@ -175,16 +172,20 @@ public class RiftsawServiceLocator implements ServiceLocator {
                     new java.util.Vector<javax.wsdl.PortType>();
         private java.util.List<QName> _services=
                     new java.util.Vector<QName>();
+        
+        private QName _componentName;
 
         /**
          * This method registers the wsdl, port type and service details.
          *
          * @param portType The port type
          * @param service The SwitchYard service
+         * @param componentName the service component name for this registry entry
          */
-        public void register(javax.wsdl.PortType portType, QName service) {
+        public void register(javax.wsdl.PortType portType, QName service, QName componentName) {
             _portTypes.add(portType);
             _services.add(service);
+            _componentName = componentName;
         }
         
         /**
@@ -200,7 +201,8 @@ public class RiftsawServiceLocator implements ServiceLocator {
             Service ret = null;
             for (int index = 0, count = _services.size(); index < count; ++index) {
                 if (serviceName.equals(_services.get(index))) {
-                    ServiceReference sref = serviceDomain.getServiceReference(serviceName);
+                    QName refName = ComponentNames.qualify(_componentName, serviceName);
+                    ServiceReference sref = serviceDomain.getServiceReference(refName);
                     if (sref != null) {
                         ret = new ServiceProxy(sref, _portTypes.get(index));
                     }

@@ -19,13 +19,11 @@ import junit.framework.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.switchyard.Exchange;
+import org.switchyard.MockDomain;
 import org.switchyard.ServiceDomain;
-import org.switchyard.component.sca.RemoteEndpointPublisher;
-import org.switchyard.component.sca.SwitchYardRemotingServlet;
 import org.switchyard.deploy.internal.Deployment;
-import org.switchyard.internal.DomainImpl;
+import org.switchyard.extensions.java.JavaService;
 import org.switchyard.metadata.InOnlyService;
-import org.switchyard.metadata.java.JavaService;
 import org.switchyard.remote.RemoteMessage;
 import org.switchyard.remote.http.HttpInvoker;
 import org.switchyard.serial.FormatType;
@@ -46,8 +44,8 @@ public class SwitchYardRemotingServletTest {
     
     @Before
     public void setUp() throws Exception {
-        domain = new DomainImpl(new QName("test"));
-        domain.getProperties().put(Deployment.CLASSLOADER_PROPERTY, this.getClass().getClassLoader());
+        domain = new MockDomain();
+        domain.setProperty(Deployment.CLASSLOADER_PROPERTY, this.getClass().getClassLoader());
         RemoteEndpointPublisher rep = mock(RemoteEndpointPublisher.class);
         when(rep.getDomain(TEST_SERVICE)).thenReturn(domain);
         servlet = new SwitchYardRemotingServlet();

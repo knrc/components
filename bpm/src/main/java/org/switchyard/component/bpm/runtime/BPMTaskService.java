@@ -1,20 +1,15 @@
-/* 
- * JBoss, Home of Professional Open Source 
- * Copyright 2013 Red Hat Inc. and/or its affiliates and other contributors
- * as indicated by the @author tags. All rights reserved. 
- * See the copyright.txt in the distribution for a 
- * full listing of individual contributors.
+/*
+ * Copyright 2013 Red Hat Inc. and/or its affiliates and other contributors.
  *
- * This copyrighted material is made available to anyone wishing to use, 
- * modify, copy, or redistribute it subject to the terms and conditions 
- * of the GNU Lesser General Public License, v. 2.1. 
- * This program is distributed in the hope that it will be useful, but WITHOUT A 
- * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A 
- * PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more details. 
- * You should have received a copy of the GNU Lesser General Public License, 
- * v.2.1 along with this distribution; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, 
- * MA  02110-1301, USA.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,  
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package org.switchyard.component.bpm.runtime;
 
@@ -26,7 +21,9 @@ import java.util.Map;
 import javax.persistence.EntityManagerFactory;
 
 import org.jbpm.services.task.HumanTaskServiceFactory;
+import org.jbpm.services.task.exception.TaskException;
 import org.jbpm.services.task.impl.TaskServiceEntryPointImpl;
+import org.jbpm.services.task.rule.TaskRuleService;
 import org.jbpm.services.task.utils.ContentMarshallerHelper;
 import org.jbpm.shared.services.api.JbpmServicesTransactionManager;
 import org.jbpm.shared.services.impl.events.JbpmServicesEventListener;
@@ -37,6 +34,7 @@ import org.kie.internal.task.api.InternalTaskService;
 import org.kie.internal.task.api.TaskContentService;
 import org.kie.internal.task.api.TaskQueryService;
 import org.kie.internal.task.api.UserGroupCallback;
+import org.kie.internal.task.api.model.ContentData;
 import org.kie.internal.task.api.model.NotificationEvent;
 import org.switchyard.common.type.reflect.Access;
 import org.switchyard.common.type.reflect.FieldAccess;
@@ -78,13 +76,15 @@ public interface BPMTaskService extends InternalTaskService, EventService<JbpmSe
 
         private static final class TaskServiceInvocationHandler implements InvocationHandler {
 
-            private static final Access<TaskQueryService> TASK_QUERY_SERVICE_ACCESS;
             private static final Access<TaskContentService> TASK_CONTENT_SERVICE_ACCESS;
+            private static final Access<TaskQueryService> TASK_QUERY_SERVICE_ACCESS;
+            private static final Access<TaskRuleService> TASK_RULE_SERVICE_ACCESS;
             private static final Method GET_TASK_CONTENT_METHOD;
             static {
                 try {
-                    TASK_QUERY_SERVICE_ACCESS = new FieldAccess<TaskQueryService>(TaskServiceEntryPointImpl.class, "taskQueryService");
                     TASK_CONTENT_SERVICE_ACCESS = new FieldAccess<TaskContentService>(TaskServiceEntryPointImpl.class, "taskContentService");
+                    TASK_QUERY_SERVICE_ACCESS = new FieldAccess<TaskQueryService>(TaskServiceEntryPointImpl.class, "taskQueryService");
+                    TASK_RULE_SERVICE_ACCESS = new FieldAccess<TaskRuleService>(TaskServiceEntryPointImpl.class, "taskRuleService");
                     GET_TASK_CONTENT_METHOD = InternalTaskService.class.getDeclaredMethod("getTaskContent", new Class[]{long.class});
                 } catch (Throwable t) {
                     throw new RuntimeException("reflection problem during initialization: " + t.getMessage(), t);
@@ -92,14 +92,16 @@ public interface BPMTaskService extends InternalTaskService, EventService<JbpmSe
             }
 
             private final InternalTaskService _internalTaskService;
-            private final TaskQueryService _taskQueryService;
             private final TaskContentService _taskContentService;
+            private final TaskQueryService _taskQueryService;
             private final ClassLoader _loader;
 
             private TaskServiceInvocationHandler(InternalTaskService internalTaskService, ClassLoader loader) {
                 _internalTaskService = internalTaskService;
-                _taskQueryService = TASK_QUERY_SERVICE_ACCESS.read(internalTaskService);
                 _taskContentService = TASK_CONTENT_SERVICE_ACCESS.read(internalTaskService);
+                _taskQueryService = TASK_QUERY_SERVICE_ACCESS.read(internalTaskService);
+                TaskRuleService taskRuleService = TASK_RULE_SERVICE_ACCESS.read(internalTaskService);
+                TASK_RULE_SERVICE_ACCESS.write(internalTaskService, new TaskRuleServiceWrapper(taskRuleService, loader));
                 _loader = loader;
             }
 
@@ -127,6 +129,24 @@ public interface BPMTaskService extends InternalTaskService, EventService<JbpmSe
                     throw t;
                 }
                 return ret;
+            }
+
+            private static final class TaskRuleServiceWrapper implements TaskRuleService {
+                private final TaskRuleService _wrapped;
+                private final ClassLoader _loader;
+                public TaskRuleServiceWrapper(TaskRuleService wrapped, ClassLoader loader) {
+                    _wrapped = wrapped;
+                    _loader = loader;
+                }
+                @Override
+                public void executeRules(Task task, String userId, ContentData contentData, String scope) throws TaskException {
+                    Object params = ContentMarshallerHelper.unmarshall(contentData.getContent(), null, _loader);
+                    executeRules(task, userId, params, scope);
+                }
+                @Override
+                public void executeRules(Task task, String userId, Object params, String scope) throws TaskException {
+                    _wrapped.executeRules(task, userId, params, scope);
+                }
             }
 
         }

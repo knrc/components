@@ -1,20 +1,15 @@
-/* 
- * JBoss, Home of Professional Open Source 
- * Copyright 2013 Red Hat Inc. and/or its affiliates and other contributors
- * as indicated by the @author tags. All rights reserved. 
- * See the copyright.txt in the distribution for a 
- * full listing of individual contributors.
+/*
+ * Copyright 2013 Red Hat Inc. and/or its affiliates and other contributors.
  *
- * This copyrighted material is made available to anyone wishing to use, 
- * modify, copy, or redistribute it subject to the terms and conditions 
- * of the GNU Lesser General Public License, v. 2.1. 
- * This program is distributed in the hope that it will be useful, but WITHOUT A 
- * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A 
- * PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more details. 
- * You should have received a copy of the GNU Lesser General Public License, 
- * v.2.1 along with this distribution; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, 
- * MA  02110-1301, USA.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,  
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package org.switchyard.component.soap.config.model;
 
@@ -29,6 +24,7 @@ import org.switchyard.config.model.composite.BindingModel;
  * A SOAPBinding Model.
  *
  * @author David Ward &lt;<a href="mailto:dward@jboss.org">dward@jboss.org</a>&gt; &copy; 2013 Red Hat Inc.
+ * @author Magesh Kumar B <mageshbk@jboss.com> (C) 2013 Red Hat Inc.
  */
 public interface SOAPBindingModel extends BindingModel {
 
@@ -145,6 +141,56 @@ public interface SOAPBindingModel extends BindingModel {
      * @return this SOAPBindingModel (useful for chaining)
      */
     public SOAPBindingModel setEndpointAddress(String endpointAddress);
+    /**
+     * Gets the basic config.
+     * @return the basic config
+     */
+    public BasicAuthModel getBasicAuthConfig();
+
+    /**
+     * Sets the basic config.
+     * @param config the basic config
+     * @return this SOAPBindingModel
+     */
+    public SOAPBindingModel setBasicAuthConfig(BasicAuthModel config);
+
+    /**
+     * Gets the ntlm config.
+     * @return the ntlm config
+     */
+    public NtlmAuthModel getNtlmAuthConfig();
+
+    /**
+     * Sets the ntlm config.
+     * @param config the ntlm config
+     * @return this SOAPBindingModel
+     */
+    public SOAPBindingModel setNtlmAuthConfig(NtlmAuthModel config);
+
+    /**
+     * Check if Basic authentication is set.
+     * @return true if Basic, false otherwise
+     */
+    public Boolean isBasicAuth();
+
+    /**
+     * Check if authentication is set.
+     * @return true if set, false otherwise
+     */
+    public Boolean hasAuthentication();
+
+    /**
+     * Gets the proxy config.
+     * @return the proxy config
+     */
+    public ProxyModel getProxyConfig();
+
+    /**
+     * Sets the proxy config.
+     * @param proxyConfig the proxy config
+     * @return this SOAPBindingModel (useful for chaining)
+     */
+    public SOAPBindingModel setProxyConfig(ProxyModel proxyConfig);
 
     /**
      * Gets the mtom config.

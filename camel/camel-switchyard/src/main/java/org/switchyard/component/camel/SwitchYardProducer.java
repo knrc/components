@@ -1,20 +1,15 @@
 /*
- * JBoss, Home of Professional Open Source
- * Copyright 2011 Red Hat Inc. and/or its affiliates and other contributors
- * as indicated by the @authors tag. All rights reserved.
- * See the copyright.txt in the distribution for a
- * full listing of individual contributors.
- *  *
- * This copyrighted material is made available to anyone wishing to use,
- * modify, copy, or redistribute it subject to the terms and conditions
- * of the GNU Lesser General Public License, v. 2.1.
- * This program is distributed in the hope that it will be useful, but WITHOUT A
- * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
- * PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more details.
- * You should have received a copy of the GNU Lesser General Public License,
- * v.2.1 along with this distribution; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- * MA  02110-1301, USA.
+ * Copyright 2013 Red Hat Inc. and/or its affiliates and other contributors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,  
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package org.switchyard.component.camel;
 
@@ -28,6 +23,7 @@ import org.apache.camel.Endpoint;
 import org.apache.camel.impl.DefaultProducer;
 import org.apache.log4j.Logger;
 import org.switchyard.Exchange;
+import org.switchyard.ExchangePhase;
 import org.switchyard.Message;
 import org.switchyard.Scope;
 import org.switchyard.ServiceDomain;
@@ -39,7 +35,7 @@ import org.switchyard.component.camel.common.composer.BindingDataCreatorResolver
 import org.switchyard.component.camel.common.composer.CamelBindingData;
 import org.switchyard.component.common.composer.MessageComposer;
 import org.switchyard.component.common.composer.SecurityBindingData;
-import org.switchyard.exception.SwitchYardException;
+import org.switchyard.SwitchYardException;
 import org.switchyard.label.BehaviorLabel;
 import org.switchyard.metadata.ServiceOperation;
 import org.switchyard.policy.PolicyUtil;
@@ -65,7 +61,6 @@ import org.switchyard.selector.OperationSelector;
 public class SwitchYardProducer extends DefaultProducer {
 
     private final static Logger LOG = Logger.getLogger(SwitchYardProducer.class);
-    private String _namespace;
     private String _operationName;
     private final MessageComposer<CamelBindingData> _messageComposer;
 
@@ -73,25 +68,29 @@ public class SwitchYardProducer extends DefaultProducer {
      * Sole constructor.
      * 
      * @param endpoint the Camel Endpoint that this Producer belongs to.
-     * @param namespace the service namespace of the target SwitchYard service.
      * @param operationName the operation name of the target SwitchYard service.
      * @param messageComposer the MessageComposer to use
      */
-    public SwitchYardProducer(final Endpoint endpoint, final String namespace, final String operationName, final MessageComposer<CamelBindingData> messageComposer) {
+    public SwitchYardProducer(final Endpoint endpoint, final String operationName, final MessageComposer<CamelBindingData> messageComposer) {
         super(endpoint);
-        _namespace = namespace;
         _operationName = operationName;
         _messageComposer = messageComposer;
     }
 
     @Override
     public void process(final org.apache.camel.Exchange camelExchange) throws Exception {
+        final String namespace = camelExchange.getProperty(CamelConstants.APPLICATION_NAMESPACE, String.class);
         final String targetUri = camelExchange.getProperty(org.apache.camel.Exchange.TO_ENDPOINT, String.class);
         ServiceDomain domain = ((SwitchYardCamelContext) camelExchange.getContext()).getServiceDomain();
+        final ServiceReference serviceRef = lookupServiceReference(targetUri, namespace, domain, 
+                camelExchange.getProperty(SwitchYardConsumer.COMPONENT_NAME, QName.class));
 
-        final ServiceReference serviceRef = lookupServiceReference(targetUri, domain);
-        MessageComposer<CamelBindingData> composer = getMessageComposer(camelExchange);
-
+        // set a flag to indicate whether this producer endpoint is used within a service route
+        boolean isGatewayRoute = camelExchange.getProperty(SwitchYardConsumer.IMPLEMENTATION_ROUTE) == null;
+        
+        // the composer is not used for switchyard:// endpoints invoked from service routes
+        MessageComposer<CamelBindingData> composer = 
+                isGatewayRoute ? getMessageComposer(camelExchange) : null;
         final Exchange switchyardExchange = createSwitchyardExchange(camelExchange, serviceRef, composer);
 
         // Set appropriate policy based on Camel exchange properties
@@ -99,7 +98,23 @@ public class SwitchYardProducer extends DefaultProducer {
             PolicyUtil.provide(switchyardExchange, TransactionPolicy.PROPAGATES_TRANSACTION);
             PolicyUtil.provide(switchyardExchange, TransactionPolicy.MANAGED_TRANSACTION_GLOBAL);
         }
-
+        
+        // Message composition depends on whether this switchyard:// endpoint is called from
+        // a Camel service implementation or a Camel gateway
+        Message switchyardMessage;
+        if (isGatewayRoute) {
+            switchyardMessage = composeForGateway(composer, camelExchange, switchyardExchange);
+        } else {
+            switchyardMessage = ExchangeMapper.mapCamelToSwitchYard(
+                    camelExchange, switchyardExchange, ExchangePhase.IN);
+        }
+        
+        switchyardExchange.send(switchyardMessage);
+    }
+    
+    private Message composeForGateway(MessageComposer<CamelBindingData> composer, 
+            org.apache.camel.Exchange camelExchange, Exchange switchyardExchange) throws Exception {
+        
         BindingDataCreator<?> bindingCreator = getBindingDataCreator(camelExchange);
         CamelBindingData bindingData = bindingCreator.createBindingData(camelExchange.getIn());
         if (bindingData instanceof SecurityBindingData) {
@@ -107,7 +122,6 @@ public class SwitchYardProducer extends DefaultProducer {
             SecurityContext.get(switchyardExchange).getCredentials().addAll(
                 ((SecurityBindingData) bindingData).extractCredentials());
         }
-        Message switchyardMessage = composer.compose(bindingData, switchyardExchange);
         
         /*
          * initialize the gateway name on the context. this was most likely not
@@ -119,7 +133,8 @@ public class SwitchYardProducer extends DefaultProducer {
                     .setProperty(ExchangeCompletionEvent.GATEWAY_NAME, gatewayName, Scope.EXCHANGE)
                     .addLabels(BehaviorLabel.TRANSIENT.label());
         }
-        switchyardExchange.send(switchyardMessage);
+        
+        return composer.compose(bindingData, switchyardExchange);
     }
 
     /**
@@ -156,8 +171,9 @@ public class SwitchYardProducer extends DefaultProducer {
         return composer == null ? _messageComposer : composer;
     }
 
-    private ServiceReference lookupServiceReference(final String targetUri, ServiceDomain domain) {
-        final QName serviceName = composeSwitchYardServiceName(_namespace, targetUri);
+    private ServiceReference lookupServiceReference(
+            final String targetUri, final String namespace, ServiceDomain domain, QName componentName) {
+        final QName serviceName = composeSwitchYardServiceName(namespace, targetUri, componentName);
         final ServiceReference serviceRef = domain.getServiceReference(serviceName);
         if (serviceRef == null) {
             throw new NullPointerException("No ServiceReference was found for uri [" + targetUri + "]");
@@ -195,7 +211,7 @@ public class SwitchYardProducer extends DefaultProducer {
                 operationName = ops.iterator().next().getName();
             } else {
                 // See if the existing camel operation exists on the target service
-                String camelOp = camelExchange.getIn().getHeader(Exchange.OPERATION_NAME, String.class);
+                String camelOp = camelExchange.getProperty(Exchange.OPERATION_NAME, String.class);
                 if (serviceRef.getInterface().getOperation(camelOp) != null) {
                     operationName = camelOp;
                 }

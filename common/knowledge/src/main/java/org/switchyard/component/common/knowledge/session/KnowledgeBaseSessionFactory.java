@@ -1,20 +1,15 @@
-/* 
- * JBoss, Home of Professional Open Source 
- * Copyright 2012 Red Hat Inc. and/or its affiliates and other contributors
- * as indicated by the @author tags. All rights reserved. 
- * See the copyright.txt in the distribution for a 
- * full listing of individual contributors.
+/*
+ * Copyright 2013 Red Hat Inc. and/or its affiliates and other contributors.
  *
- * This copyrighted material is made available to anyone wishing to use, 
- * modify, copy, or redistribute it subject to the terms and conditions 
- * of the GNU Lesser General Public License, v. 2.1. 
- * This program is distributed in the hope that it will be useful, but WITHOUT A 
- * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A 
- * PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more details. 
- * You should have received a copy of the GNU Lesser General Public License, 
- * v.2.1 along with this distribution; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, 
- * MA  02110-1301, USA.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,  
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package org.switchyard.component.common.knowledge.session;
 
@@ -37,6 +32,7 @@ import org.kie.internal.builder.KnowledgeBuilderError;
 import org.kie.internal.builder.KnowledgeBuilderErrors;
 import org.kie.internal.builder.KnowledgeBuilderFactory;
 import org.switchyard.ServiceDomain;
+import org.switchyard.SwitchYardException;
 import org.switchyard.component.common.knowledge.config.model.KnowledgeComponentImplementationModel;
 import org.switchyard.component.common.knowledge.util.Channels;
 import org.switchyard.component.common.knowledge.util.Configurations;
@@ -44,7 +40,6 @@ import org.switchyard.component.common.knowledge.util.Environments;
 import org.switchyard.component.common.knowledge.util.Listeners;
 import org.switchyard.component.common.knowledge.util.Loggers;
 import org.switchyard.component.common.knowledge.util.Resources;
-import org.switchyard.exception.SwitchYardException;
 
 /**
  * A Base-based KnowledgeSessionFactory.
@@ -71,7 +66,7 @@ class KnowledgeBaseSessionFactory extends KnowledgeSessionFactory {
     KnowledgeBaseSessionFactory(KnowledgeComponentImplementationModel model, ClassLoader loader, ServiceDomain domain, Properties propertyOverrides) {
         super(model, loader, domain, propertyOverrides);
         _base = newBase();
-        _sessionConfiguration = Configurations.getSessionConfiguration(getModel(), getPropertyOverrides());
+        _sessionConfiguration = Configurations.getSessionConfiguration(getModel(), getLoader(), getPropertyOverrides());
     }
 
     /**
@@ -121,9 +116,9 @@ class KnowledgeBaseSessionFactory extends KnowledgeSessionFactory {
     }
 
     private KieBase newBase() {
-        KieBaseConfiguration baseConfiguration = Configurations.getBaseConfiguration(getModel(), getPropertyOverrides(), getLoader());
+        KieBaseConfiguration baseConfiguration = Configurations.getBaseConfiguration(getModel(), getLoader(), getPropertyOverrides());
         KnowledgeBase base = KnowledgeBaseFactory.newKnowledgeBase(baseConfiguration);
-        KnowledgeBuilderConfiguration builderConfiguration = Configurations.getBuilderConfiguration(getModel(), getPropertyOverrides(), getLoader());
+        KnowledgeBuilderConfiguration builderConfiguration = Configurations.getBuilderConfiguration(getModel(), getLoader(), getPropertyOverrides());
         KnowledgeBuilder builder = KnowledgeBuilderFactory.newKnowledgeBuilder(base, builderConfiguration);
         Resources.addResources(getModel(), getLoader(), builder);
         try {

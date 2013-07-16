@@ -1,20 +1,15 @@
 /*
- * JBoss, Home of Professional Open Source
- * Copyright 2012 Red Hat Inc. and/or its affiliates and other contributors
- * as indicated by the @authors tag. All rights reserved.
- * See the copyright.txt in the distribution for a
- * full listing of individual contributors.
+ * Copyright 2013 Red Hat Inc. and/or its affiliates and other contributors.
  *
- * This copyrighted material is made available to anyone wishing to use,
- * modify, copy, or redistribute it subject to the terms and conditions
- * of the GNU Lesser General Public License, v. 2.1.
- * This program is distributed in the hope that it will be useful, but WITHOUT A
- * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
- * PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more details.
- * You should have received a copy of the GNU Lesser General Public License,
- * v.2.1 along with this distribution; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- * MA  02110-1301, USA.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,  
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.switchyard.component.http.config.model;
@@ -23,6 +18,7 @@ import org.junit.Assert;
 import org.junit.Test;
 import org.switchyard.component.http.config.model.BasicAuthModel;
 import org.switchyard.component.http.config.model.HttpBindingModel;
+import org.switchyard.component.http.config.model.ProxyModel;
 import org.switchyard.config.model.ModelPuller;
 
 /**
@@ -35,6 +31,7 @@ public class HttpConfigModelTest {
     private static final String HTTP_BINDING = "http-binding.xml";
     private static final String HTTP_BINDING2 = "http-binding2.xml";
     private static final String HTTP_BINDING_AUTH = "http-binding-auth.xml";
+    private static final String HTTP_BINDING_PROXY = "http-binding-proxy.xml";
 
     @Test
     public void testReadConfigBinding() throws Exception {
@@ -56,5 +53,18 @@ public class HttpConfigModelTest {
         Assert.assertEquals("Beal", authConfig.getUser());
         Assert.assertEquals("conjecture", authConfig.getPassword());
         Assert.assertEquals("Any", authConfig.getRealm());
+    }
+
+    @Test
+    public void proxyConfigBinding() throws Exception {
+        ModelPuller<HttpBindingModel> puller = new ModelPuller<HttpBindingModel>();
+        HttpBindingModel model = puller.pull(HTTP_BINDING_PROXY, getClass());
+        Assert.assertTrue(model.isModelValid());
+        ProxyModel proxyConfig = model.getProxyConfig();
+        Assert.assertNotNull(proxyConfig);
+        Assert.assertEquals("host", proxyConfig.getHost());
+        Assert.assertEquals("8090", proxyConfig.getPort());
+        Assert.assertEquals("Beal", proxyConfig.getUser());
+        Assert.assertEquals("conjecture", proxyConfig.getPassword());
     }
 }

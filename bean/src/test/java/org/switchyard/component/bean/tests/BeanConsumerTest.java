@@ -1,20 +1,15 @@
-/* 
- * JBoss, Home of Professional Open Source 
- * Copyright 2011 Red Hat Inc. and/or its affiliates and other contributors
- * as indicated by the @author tags. All rights reserved. 
- * See the copyright.txt in the distribution for a 
- * full listing of individual contributors.
+/*
+ * Copyright 2013 Red Hat Inc. and/or its affiliates and other contributors.
  *
- * This copyrighted material is made available to anyone wishing to use, 
- * modify, copy, or redistribute it subject to the terms and conditions 
- * of the GNU Lesser General Public License, v. 2.1. 
- * This program is distributed in the hope that it will be useful, but WITHOUT A 
- * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A 
- * PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more details. 
- * You should have received a copy of the GNU Lesser General Public License, 
- * v.2.1 along with this distribution; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, 
- * MA  02110-1301, USA.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,  
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.switchyard.component.bean.tests;
@@ -22,14 +17,15 @@ package org.switchyard.component.bean.tests;
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.switchyard.HandlerException;
 import org.switchyard.Message;
+import org.switchyard.component.bean.BeanComponentException;
+import org.switchyard.component.test.mixins.cdi.CDIMixIn;
 import org.switchyard.test.InvocationFaultException;
 import org.switchyard.test.Invoker;
 import org.switchyard.test.ServiceOperation;
 import org.switchyard.test.SwitchYardRunner;
 import org.switchyard.test.SwitchYardTestCaseConfig;
-import org.switchyard.component.bean.BeanComponentException;
-import org.switchyard.component.test.mixins.cdi.CDIMixIn;
 
 /*
  * Assorted methods for testing a CDI bean consuming a service in SwitchYard.
@@ -105,8 +101,8 @@ public class BeanConsumerTest {
         } catch (InvocationFaultException infEx) {
             System.out.println(infEx.getFaultMessage().getContent());
             Message faultMsg = infEx.getFaultMessage();
-            Assert.assertTrue(faultMsg.getContent() instanceof BeanComponentException);
-            Assert.assertEquals("throw me a remote exception please!!", faultMsg.getContent(BeanComponentException.class).getCause().getCause().getMessage());
+            Assert.assertTrue(faultMsg.getContent() instanceof HandlerException);
+            Assert.assertEquals("throw me a remote exception please!!", faultMsg.getContent(HandlerException.class).getCause().getCause().getMessage());
         }
     }
 }

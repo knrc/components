@@ -1,24 +1,19 @@
 /*
- * JBoss, Home of Professional Open Source Copyright 2009, Red Hat Middleware
- * LLC, and individual contributors by the @authors tag. See the copyright.txt
- * in the distribution for a full listing of individual contributors.
- * 
- * This is free software; you can redistribute it and/or modify it under the
- * terms of the GNU Lesser General Public License as published by the Free
- * Software Foundation; either version 2.1 of the License, or (at your option)
- * any later version.
- * 
- * This software is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
- * FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more
- * details.
- * 
- * You should have received a copy of the GNU Lesser General Public License
- * along with this software; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA, or see the FSF
- * site: http://www.fsf.org.
+ * Copyright 2013 Red Hat Inc. and/or its affiliates and other contributors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,  
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package org.switchyard.component.camel;
+
+import static org.switchyard.component.camel.common.CamelConstants.SWITCHYARD_COMPONENT_NAME;
 
 import java.net.URI;
 import java.util.HashMap;
@@ -27,9 +22,7 @@ import java.util.Map;
 import javax.xml.namespace.QName;
 
 import org.switchyard.common.xml.XMLHelper;
-import org.switchyard.component.camel.common.SwitchYardRouteDefinition;
-
-import static org.switchyard.component.camel.common.CamelConstants.SWITCHYARD_COMPONENT_NAME;
+import org.switchyard.deploy.ComponentNames;
 
 /**
  * Utility class that takes care of creating Camel component uris for 
@@ -54,7 +47,7 @@ public final class ComponentNameComposer {
     public static String composeComponentUri(final QName serviceName) {
         final StringBuilder sb = new StringBuilder();
         sb.append(SWITCHYARD_COMPONENT_NAME).append("://").append(serviceName.getLocalPart());
-        return SwitchYardRouteDefinition.addNamespaceParameter(sb.toString(), serviceName.getNamespaceURI());
+        return sb.toString();
     }
 
     /**
@@ -62,23 +55,19 @@ public final class ComponentNameComposer {
      * 
      * @param namespace the service namespace
      * @param uri a string uri.
+     * @param componentName service componentName
      * @return QName a SwitchYard service name
      */
-    public static QName composeSwitchYardServiceName(final String namespace, final String uri) {
+    public static QName composeSwitchYardServiceName(
+            final String namespace, final String uri, final QName componentName) {
         final URI create = URI.create(uri);
         final String path = create.getAuthority();
-        return XMLHelper.createQName(namespace, path);
-    }
-
-    /**
-     * Parses the passed-in URI query parameters and returns the value of
-     * the param named 'namespace'.
-     * 
-     * @param uri the URI to parse.
-     * @return String the 'namespace' param or null if it does not exist
-     */
-    public static String getNamespaceFromURI(final URI uri) {
-        return getQueryParamMap(uri).get("namespace");
+        if (componentName != null) {
+            return ComponentNames.qualify(componentName.getLocalPart(), path, namespace);
+        } else {
+            return XMLHelper.createQName(namespace, path);
+        }
+        
     }
 
     /**

@@ -1,22 +1,15 @@
 /*
- * JBoss, Home of Professional Open Source Copyright 2009, Red Hat Middleware
- * LLC, and individual contributors by the @authors tag. See the copyright.txt
- * in the distribution for a full listing of individual contributors.
- * 
- * This is free software; you can redistribute it and/or modify it under the
- * terms of the GNU Lesser General Public License as published by the Free
- * Software Foundation; either version 2.1 of the License, or (at your option)
- * any later version.
- * 
- * This software is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
- * FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more
- * details.
- * 
- * You should have received a copy of the GNU Lesser General Public License
- * along with this software; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA, or see the FSF
- * site: http://www.fsf.org.
+ * Copyright 2013 Red Hat Inc. and/or its affiliates and other contributors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,  
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package org.switchyard.component.camel.deploy;
 
@@ -70,18 +63,18 @@ public class CamelMathTest {
         all.expectedMessageCount(2);
         all.expectedBodiesReceived(100.0, 101.0);
         // in this case 
-        all.expectedHeaderReceived(Exchange.SERVICE_NAME, MATH_ALL_SERVICE_NS);
-        all.expectedHeaderReceived(Exchange.SERVICE_NAME, MATH_ALL_SERVICE_NS);
+        all.expectedPropertyReceived(Exchange.SERVICE_NAME, MATH_ALL_SERVICE_NS);
+        all.expectedPropertyReceived(Exchange.SERVICE_NAME, MATH_ALL_SERVICE_NS);
 
         MockEndpoint cos = _camelContext.getEndpoint("mock:cos", MockEndpoint.class);
         cos.expectedMessageCount(1);
         cos.expectedBodiesReceived(101.0);
-        cos.expectedHeaderReceived(Exchange.SERVICE_NAME, MATH_COS_SERVICE_NS);
+        cos.expectedPropertyReceived(Exchange.SERVICE_NAME, MATH_COS_SERVICE_NS);
 
         MockEndpoint abs = _camelContext.getEndpoint("mock:abs", MockEndpoint.class);
         abs.expectedMessageCount(1);
         abs.expectedBodiesReceived(100.0);
-        abs.expectedHeaderReceived(Exchange.SERVICE_NAME, MATH_ABS_SERVICE_NS);
+        abs.expectedPropertyReceived(Exchange.SERVICE_NAME, MATH_ABS_SERVICE_NS);
 
         invoker.operation("abs").sendInOut(100.0);
         invoker.operation("cos").sendInOut(101.0);
@@ -96,9 +89,9 @@ public class CamelMathTest {
     public void shouldReahUnknown() throws Exception {
         MockEndpoint unknown = _camelContext.getEndpoint("mock:unknown", MockEndpoint.class);
         unknown.expectedBodiesReceived(10.1);
-        unknown.expectedHeaderReceived(Exchange.OPERATION_NAME, "pow");
-        unknown.expectedHeaderReceived(Exchange.SERVICE_NAME, MATH_SERVICE_NS);
-        unknown.expectedHeaderReceived(Exchange.FAULT_TYPE, "java:" + IllegalArgumentException.class.getName());
+        unknown.expectedPropertyReceived(Exchange.OPERATION_NAME, "pow");
+        unknown.expectedPropertyReceived(Exchange.SERVICE_NAME, MATH_SERVICE_NS);
+        unknown.expectedPropertyReceived(Exchange.FAULT_TYPE, "java:" + IllegalArgumentException.class.getName());
 
         invoker.operation("pow").sendInOut(10.1);
 

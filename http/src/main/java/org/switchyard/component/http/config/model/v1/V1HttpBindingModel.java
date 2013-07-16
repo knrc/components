@@ -1,20 +1,15 @@
 /*
- * JBoss, Home of Professional Open Source
- * Copyright 2013 Red Hat Inc. and/or its affiliates and other contributors
- * as indicated by the @authors tag. All rights reserved.
- * See the copyright.txt in the distribution for a
- * full listing of individual contributors.
+ * Copyright 2013 Red Hat Inc. and/or its affiliates and other contributors.
  *
- * This copyrighted material is made available to anyone wishing to use,
- * modify, copy, or redistribute it subject to the terms and conditions
- * of the GNU Lesser General Public License, v. 2.1.
- * This program is distributed in the hope that it will be useful, but WITHOUT A
- * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
- * PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more details.
- * You should have received a copy of the GNU Lesser General Public License,
- * v.2.1 along with this distribution; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- * MA  02110-1301, USA.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,  
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.switchyard.component.http.config.model.v1;
@@ -26,6 +21,7 @@ import org.switchyard.component.http.config.model.HttpBindingModel;
 import org.switchyard.component.http.config.model.HttpNameValueModel;
 import org.switchyard.component.http.config.model.HttpNameValueModel.HttpName;
 import org.switchyard.component.http.config.model.NtlmAuthModel;
+import org.switchyard.component.http.config.model.ProxyModel;
 import org.switchyard.config.Configuration;
 import org.switchyard.config.model.Descriptor;
 import org.switchyard.config.model.composite.v1.V1BindingModel;
@@ -43,7 +39,8 @@ public class V1HttpBindingModel extends V1BindingModel implements HttpBindingMod
         HttpName.method.name(),
         HttpName.contentType.name(),
         HttpName.basic.name(),
-        HttpName.ntlm.name()
+        HttpName.ntlm.name(),
+        HttpName.proxy.name()
     };
 
     private Configuration _environment;
@@ -56,6 +53,7 @@ public class V1HttpBindingModel extends V1BindingModel implements HttpBindingMod
     private HttpNameValueModel _contentType;
     private BasicAuthModel _basicAuth;
     private NtlmAuthModel _ntlmAuth;
+    private ProxyModel _proxyConfig;
 
     /**
      * Constructor.
@@ -208,6 +206,27 @@ public class V1HttpBindingModel extends V1BindingModel implements HttpBindingMod
     public HttpBindingModel setNtlmAuthConfig(NtlmAuthModel config) {
         setChildModel(config);
         _ntlmAuth = config;
+        return this;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public ProxyModel getProxyConfig() {
+        if (_proxyConfig == null) {
+            _proxyConfig = (ProxyModel)getFirstChildModel(HttpName.proxy.name());
+        }
+        return _proxyConfig;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public HttpBindingModel setProxyConfig(ProxyModel proxyConfig) {
+        setChildModel(proxyConfig);
+        _proxyConfig = proxyConfig;
         return this;
     }
 

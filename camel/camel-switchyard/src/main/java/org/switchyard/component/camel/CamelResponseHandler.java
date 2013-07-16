@@ -1,22 +1,15 @@
 /*
- * JBoss, Home of Professional Open Source Copyright 2009, Red Hat Middleware
- * LLC, and individual contributors by the @authors tag. See the copyright.txt
- * in the distribution for a full listing of individual contributors.
- * 
- * This is free software; you can redistribute it and/or modify it under the
- * terms of the GNU Lesser General Public License as published by the Free
- * Software Foundation; either version 2.1 of the License, or (at your option)
- * any later version.
- * 
- * This software is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
- * FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more
- * details.
- * 
- * You should have received a copy of the GNU Lesser General Public License
- * along with this software; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA, or see the FSF
- * site: http://www.fsf.org.
+ * Copyright 2013 Red Hat Inc. and/or its affiliates and other contributors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,  
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package org.switchyard.component.camel;
 
@@ -28,7 +21,7 @@ import org.switchyard.HandlerException;
 import org.switchyard.ServiceReference;
 import org.switchyard.component.camel.common.composer.CamelBindingData;
 import org.switchyard.component.common.composer.MessageComposer;
-import org.switchyard.exception.SwitchYardException;
+import org.switchyard.SwitchYardException;
 
 /**
  * A CamelResponseHandler is responsible for passing back result data from Apache Camel to
@@ -73,8 +66,7 @@ public class CamelResponseHandler implements ExchangeHandler {
     @Override
     public void handleMessage(final Exchange switchYardExchange) throws HandlerException {
         try {
-            Message camelMsg = getCamelMessage();
-            _messageComposer.decompose(switchYardExchange, new CamelBindingData(camelMsg));
+            compose(switchYardExchange);
         } catch (Exception e) {
             throw new HandlerException(e);
         }
@@ -98,12 +90,26 @@ public class CamelResponseHandler implements ExchangeHandler {
         }
 
         try {
-            Message message = getCamelMessage();
-            _messageComposer.decompose(exchange, new CamelBindingData(message));
-            message.setFault(true);
+            Message camelMsg = compose(exchange);
+            camelMsg.setFault(true);
         } catch (Exception e) {
             _camelExchange.setException(e);
         }
     }
 
+    private Message compose(Exchange exchange) throws Exception {
+        Message camelMsg;
+        if (_messageComposer != null) {
+            camelMsg = getCamelMessage();
+            _messageComposer.decompose(exchange, new CamelBindingData(camelMsg));
+        } else {
+            camelMsg = ExchangeMapper.mapSwitchYardToCamel(exchange, _camelExchange);
+            if (isInOnly()) {
+                _camelExchange.setIn(camelMsg);
+            } else {
+                _camelExchange.setOut(camelMsg);
+            }
+        }
+        return camelMsg;
+    }
 }

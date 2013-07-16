@@ -1,25 +1,22 @@
 /*
- * JBoss, Home of Professional Open Source
- * Copyright 2012 Red Hat Inc. and/or its affiliates and other contributors
- * as indicated by the @authors tag. All rights reserved.
- * See the copyright.txt in the distribution for a
- * full listing of individual contributors.
+ * Copyright 2013 Red Hat Inc. and/or its affiliates and other contributors.
  *
- * This copyrighted material is made available to anyone wishing to use,
- * modify, copy, or redistribute it subject to the terms and conditions
- * of the GNU Lesser General Public License, v. 2.1.
- * This program is distributed in the hope that it will be useful, but WITHOUT A
- * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
- * PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more details.
- * You should have received a copy of the GNU Lesser General Public License,
- * v.2.1 along with this distribution; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- * MA  02110-1301, USA.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,  
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package org.switchyard.component.bpm.service;
 
 import static org.switchyard.component.bpm.BPMConstants.CORRELATION_KEY_PROPERTY;
 import static org.switchyard.component.bpm.BPMConstants.PROCESSS_INSTANCE_ID_PROPERTY;
+
+import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.activation.DataSource;
 import javax.xml.namespace.QName;
@@ -35,16 +32,15 @@ import org.kie.internal.builder.KnowledgeBuilder;
 import org.kie.internal.builder.KnowledgeBuilderFactory;
 import org.kie.internal.io.ResourceFactory;
 import org.switchyard.BaseHandler;
-import org.switchyard.Context;
 import org.switchyard.Exchange;
 import org.switchyard.HandlerException;
 import org.switchyard.Message;
-import org.switchyard.Property;
 import org.switchyard.Service;
 import org.switchyard.ServiceDomain;
 import org.switchyard.ServiceReference;
 import org.switchyard.component.bpm.annotation.BPM;
 import org.switchyard.component.bpm.annotation.SignalEvent;
+import org.switchyard.component.bpm.annotation.SignalEventAll;
 import org.switchyard.component.bpm.annotation.StartProcess;
 import org.switchyard.component.bpm.annotation.WorkItemHandler;
 import org.switchyard.component.bpm.config.model.BPMComponentImplementationModel;
@@ -54,9 +50,11 @@ import org.switchyard.component.common.knowledge.annotation.Input;
 import org.switchyard.component.common.knowledge.annotation.Manifest;
 import org.switchyard.component.common.knowledge.annotation.Resource;
 import org.switchyard.component.common.knowledge.service.SwitchYardServiceInvoker;
+import org.switchyard.extensions.java.JavaService;
 import org.switchyard.metadata.InOnlyService;
 import org.switchyard.metadata.InOutService;
-import org.switchyard.metadata.java.JavaService;
+import org.switchyard.test.InvocationFaultException;
+import org.switchyard.test.Invoker;
 import org.switchyard.test.SwitchYardRunner;
 import org.switchyard.test.TestDataSource;
 
@@ -148,51 +146,101 @@ public class BPMServiceTests {
         });
         serviceDomain.registerServiceReference(callService.getName(), callService.getInterface(), callService.getProviderHandler());
         BPMComponentImplementationModel bci_model = (BPMComponentImplementationModel)new BPMSwitchYardScanner().scan(ControlProcess.class).getImplementation();
+        // setting the component name to null so that the service reference doesn't use the component-qualified name
+        bci_model.getComponent().setName(null);
         QName serviceName = new QName("ControlProcess");
         BPMExchangeHandler handler = new BPMExchangeHandler(bci_model, serviceDomain, serviceName);
         Service controlService = serviceDomain.registerService(serviceName, JavaService.fromClass(ControlProcess.class), handler);
-        ServiceReference controlReference = serviceDomain.registerServiceReference(controlService.getName(), controlService.getInterface(), controlService.getProviderHandler());
+        serviceDomain.registerServiceReference(controlService.getName(), controlService.getInterface(), controlService.getProviderHandler());
         handler.start();
-        Exchange exchange = controlReference.createExchange("process");
-        Context context = exchange.getContext();
-        exchange.send(exchange.createMessage());
-        Property property = context.getProperty(PROCESSS_INSTANCE_ID_PROPERTY);
-        Long processInstanceId = property != null ? (Long)property.getValue() : null;
-        exchange = controlReference.createExchange("signal");
-        context = exchange.getContext();
-        Message message = exchange.createMessage();
-        message.getContext().setProperty(PROCESSS_INSTANCE_ID_PROPERTY, processInstanceId);
-        exchange.send(message);
+        Invoker processInvoker = new Invoker(serviceDomain, serviceName);
+        Message processResponse = processInvoker.operation("process").sendInOut(null);
+        Long processInstanceId = (Long)processResponse.getContext().getPropertyValue(PROCESSS_INSTANCE_ID_PROPERTY);
+        Invoker signalInvoker = new Invoker(serviceDomain, serviceName);
+        signalInvoker.operation("signal").property(PROCESSS_INSTANCE_ID_PROPERTY, processInstanceId).sendInOut(null);
         handler.stop();
         Assert.assertEquals("message handled", holder.getValue());
     }
 
     @Test
-    public void testCorrelateProcess() throws Exception {
-        final String correlationKey = "ABC 123";
+    public void testCorrelateProcessSuccess() throws Exception {
+        runCorrelateProcess(false);
+    }
+
+    @Test
+    public void testCorrelateProcessFailure() throws Exception {
+        runCorrelateProcess(true);
+    }
+
+    private void runCorrelateProcess(final boolean bomb) throws Exception {
+        final AtomicInteger counter = new AtomicInteger();
         final Holder holder = new Holder();
         Service callService = serviceDomain.registerService(new QName("CallService"), new InOnlyService(), new BaseHandler(){
             public void handleMessage(Exchange exchange) throws HandlerException {
-                holder.setValue("message handled");
+                int count = counter.incrementAndGet();
+                holder.setValue(String.valueOf(count));
             }
         });
         serviceDomain.registerServiceReference(callService.getName(), callService.getInterface(), callService.getProviderHandler());
         BPMComponentImplementationModel bci_model = (BPMComponentImplementationModel)new BPMSwitchYardScanner().scan(ControlProcess.class).getImplementation();
+        // setting the component name to null so that the service reference doesn't use the component-qualified name
+        bci_model.getComponent().setName(null);
         QName serviceName = new QName("ControlProcess");
         BPMExchangeHandler handler = new BPMExchangeHandler(bci_model, serviceDomain, serviceName);
         Service controlService = serviceDomain.registerService(serviceName, JavaService.fromClass(ControlProcess.class), handler);
-        ServiceReference controlReference = serviceDomain.registerServiceReference(controlService.getName(), controlService.getInterface(), controlService.getProviderHandler());
+        serviceDomain.registerServiceReference(controlService.getName(), controlService.getInterface(), controlService.getProviderHandler());
         handler.start();
-        Exchange exchange = controlReference.createExchange("process");
-        Message message = exchange.createMessage();
-        message.getContext().setProperty(CORRELATION_KEY_PROPERTY, correlationKey);
-        exchange.send(message);
-        exchange = controlReference.createExchange("signal");
-        message = exchange.createMessage();
-        message.getContext().setProperty(CORRELATION_KEY_PROPERTY, correlationKey);
-        exchange.send(message);
+        new Invoker(serviceDomain, serviceName).operation("process").property(CORRELATION_KEY_PROPERTY, "A").sendInOnly(null);
+        new Invoker(serviceDomain, serviceName).operation("process").property(CORRELATION_KEY_PROPERTY, "B").sendInOnly(null);
+        new Invoker(serviceDomain, serviceName).operation("signal").property(CORRELATION_KEY_PROPERTY, "A").sendInOnly(null);
+        InvocationFaultException fault = null;
+        try {
+            new Invoker(serviceDomain, serviceName).operation("signal").property(CORRELATION_KEY_PROPERTY, bomb ? "A" : "B").sendInOut(null);
+        } catch (InvocationFaultException ife) {
+            fault = ife;
+        }
         handler.stop();
-        Assert.assertEquals("message handled", holder.getValue());
+        if (bomb) {
+            Assert.assertNotNull(fault);
+            Assert.assertEquals("1", holder.getValue());
+        } else {
+            Assert.assertNull(fault);
+            Assert.assertEquals("2", holder.getValue());
+        }
+    }
+
+    @BPM(processId="ControlProcess", manifest=@Manifest(resources=@Resource(location=CONTROL_PROCESS_BPMN, type="BPMN2")))
+    public interface SignalAllProcesses {
+        @StartProcess
+        public Object process(Object content);
+        @SignalEventAll(eventId="test")
+        public void signal(Object content);
+    }
+
+    @Test
+    public void testSignalAllProcesses() throws Exception {
+        final AtomicInteger counter = new AtomicInteger();
+        final Holder holder = new Holder();
+        Service callService = serviceDomain.registerService(new QName("CallService"), new InOnlyService(), new BaseHandler(){
+            public void handleMessage(Exchange exchange) throws HandlerException {
+                int count = counter.incrementAndGet();
+                holder.setValue(String.valueOf(count));
+            }
+        });
+        serviceDomain.registerServiceReference(callService.getName(), callService.getInterface(), callService.getProviderHandler());
+        BPMComponentImplementationModel bci_model = (BPMComponentImplementationModel)new BPMSwitchYardScanner().scan(SignalAllProcesses.class).getImplementation();
+        // setting the component name to null so that the service reference doesn't use the component-qualified name
+        bci_model.getComponent().setName(null);
+        QName serviceName = new QName("ControlProcess");
+        BPMExchangeHandler handler = new BPMExchangeHandler(bci_model, serviceDomain, serviceName);
+        Service controlService = serviceDomain.registerService(serviceName, JavaService.fromClass(SignalAllProcesses.class), handler);
+        serviceDomain.registerServiceReference(controlService.getName(), controlService.getInterface(), controlService.getProviderHandler());
+        handler.start();
+        new Invoker(serviceDomain, serviceName).operation("process").sendInOnly(null);
+        new Invoker(serviceDomain, serviceName).operation("process").sendInOnly(null);
+        new Invoker(serviceDomain, serviceName).operation("signal").sendInOnly(null);
+        handler.stop();
+        Assert.assertEquals("2", holder.getValue());
     }
 
     @Test

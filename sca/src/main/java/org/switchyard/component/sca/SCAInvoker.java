@@ -1,20 +1,15 @@
-/* 
- * JBoss, Home of Professional Open Source 
- * Copyright 2012 Red Hat Inc. and/or its affiliates and other contributors
- * as indicated by the @author tags. All rights reserved. 
- * See the copyright.txt in the distribution for a 
- * full listing of individual contributors.
+/*
+ * Copyright 2013 Red Hat Inc. and/or its affiliates and other contributors.
  *
- * This copyrighted material is made available to anyone wishing to use, 
- * modify, copy, or redistribute it subject to the terms and conditions 
- * of the GNU Lesser General Public License, v. 2.1. 
- * This program is distributed in the hope that it will be useful, but WITHOUT A 
- * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A 
- * PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more details. 
- * You should have received a copy of the GNU Lesser General Public License, 
- * v.2.1 along with this distribution; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, 
- * MA  02110-1301, USA.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,  
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package org.switchyard.component.sca;
 
@@ -28,11 +23,10 @@ import org.switchyard.HandlerException;
 import org.switchyard.Message;
 import org.switchyard.Scope;
 import org.switchyard.ServiceReference;
-import org.switchyard.SynchronousInOutHandler;
+import org.switchyard.SwitchYardException;
+import org.switchyard.component.common.SynchronousInOutHandler;
 import org.switchyard.config.model.composite.SCABindingModel;
 import org.switchyard.deploy.BaseServiceHandler;
-import org.switchyard.deploy.Lifecycle.State;
-import org.switchyard.exception.SwitchYardException;
 import org.switchyard.label.BehaviorLabel;
 import org.switchyard.remote.RemoteMessage;
 import org.switchyard.remote.RemoteRegistry;
@@ -111,26 +105,27 @@ public class SCAInvoker extends BaseServiceHandler {
         
         // Can't send same message twice, so make a copy
         Message invokeMsg = exchange.getMessage().copy();
-        Context invokeCtx = exchange.getMessage().getContext().copy();
-        invokeMsg.getContext().setProperties(invokeCtx.getProperties());
+        exchange.getContext().mergeInto(invokeMsg.getContext());
         
         ex.send(invokeMsg);
-        if (isInOut(ex)) {
+        if (ExchangePattern.IN_OUT.equals(ex.getPattern())) {
             replyHandler.waitForOut();
             if (ex.getMessage() != null) {
                 Message replyMsg = ex.getMessage().copy();
-                Context replyCtx = ex.getMessage().getContext().copy();
-                replyMsg.getContext().setProperties(replyCtx.getProperties());
+                ex.getContext().mergeInto(replyMsg.getContext());
                 if (ExchangeState.FAULT.equals(ex.getState())) {
                     exchange.sendFault(replyMsg);
                 } else {
                     exchange.send(replyMsg);
                 }
             }
+        } else if (ExchangeState.FAULT.equals(ex.getState())) {
+            // Even though this is in-only, we need to report a runtime fault on send
+            throw createHandlerException(ex.getMessage());
         }
     }
     
-    private void invokeRemote(Exchange exchange) {
+    private void invokeRemote(Exchange exchange) throws HandlerException {
         // Figure out the QName for the service were invoking
         QName serviceName = getTargetServiceName(exchange);
 
@@ -138,16 +133,30 @@ public class SCAInvoker extends BaseServiceHandler {
             .setDomain(exchange.getProvider().getDomain().getName())
             .setService(serviceName)
             .setContent(exchange.getMessage().getContent());
-        request.setContext(exchange.getContext());
+        exchange.getContext().mergeInto(request.getContext());
 
         try {
             RemoteMessage reply = _invoker.invoke(request);
-            if (isInOut(exchange) && reply != null) {
-                Message msg = exchange.getMessage().setContent(reply.getContent());
+            if (reply == null) {
+                return;
+            }
+            
+            if (ExchangePattern.IN_OUT.equals(exchange.getPattern())) {
+                Message msg = exchange.createMessage();
+                msg.setContent(reply.getContent());
+                Context replyCtx = reply.getContext();
+                if (replyCtx != null) {
+                    replyCtx.mergeInto(exchange.getContext());
+                }
                 if (reply.isFault()) {
                     exchange.sendFault(msg);
                 } else {
                     exchange.send(msg);
+                }
+            } else {
+                // still need to account for runtime exceptions on in-only
+                if (reply.isFault()) {
+                    throw createHandlerException(reply.getContent());
                 }
             }
         } catch (java.io.IOException ioEx) {
@@ -162,6 +171,24 @@ public class SCAInvoker extends BaseServiceHandler {
         String targetName = _config.hasTarget() ? _config.getTarget() : service.getLocalPart();
         String targetNS = _config.hasTargetNamespace() ? _config.getTargetNamespace() : service.getNamespaceURI();
         return new QName(targetNS, targetName);
+    }
+    
+    private HandlerException createHandlerException(Message message) {
+        return createHandlerException(message == null ? null : message.getContent());
+    }
+    
+    private HandlerException createHandlerException(Object content) {
+        HandlerException ex;
+        if (content == null) {
+            ex = new HandlerException("Runtime fault occurred without exception details!");
+        } else if (content instanceof HandlerException) {
+            ex = (HandlerException)content;
+        } else if (content instanceof Throwable) {
+            ex = new HandlerException((Throwable)content);
+        } else {
+            ex = new HandlerException(content.toString());
+        }
+        return ex;
     }
     
     
@@ -181,10 +208,5 @@ public class SCAInvoker extends BaseServiceHandler {
                 throw new SwitchYardException("Unable to instantiate strategy class: " + strategy, ex);
             }
         }
-    }
-    
-    private boolean isInOut(Exchange exchange) {
-        return ExchangePattern.IN_OUT.equals(
-                exchange.getContract().getConsumerOperation().getExchangePattern());
     }
 }

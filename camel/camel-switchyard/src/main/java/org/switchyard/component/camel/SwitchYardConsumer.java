@@ -1,22 +1,15 @@
 /*
- * JBoss, Home of Professional Open Source Copyright 2009, Red Hat Middleware
- * LLC, and individual contributors by the @authors tag. See the copyright.txt
- * in the distribution for a full listing of individual contributors.
- * 
- * This is free software; you can redistribute it and/or modify it under the
- * terms of the GNU Lesser General Public License as published by the Free
- * Software Foundation; either version 2.1 of the License, or (at your option)
- * any later version.
- * 
- * This software is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
- * FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more
- * details.
- * 
- * You should have received a copy of the GNU Lesser General Public License
- * along with this software; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA, or see the FSF
- * site: http://www.fsf.org.
+ * Copyright 2013 Red Hat Inc. and/or its affiliates and other contributors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,  
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package org.switchyard.component.camel;
 
@@ -26,7 +19,6 @@ import static org.switchyard.Exchange.SERVICE_NAME;
 
 import java.util.concurrent.atomic.AtomicReference;
 
-import javax.activation.DataHandler;
 import javax.xml.namespace.QName;
 
 import org.apache.camel.Endpoint;
@@ -35,17 +27,13 @@ import org.apache.camel.impl.DefaultConsumer;
 import org.apache.camel.impl.DefaultMessage;
 import org.switchyard.Exchange;
 import org.switchyard.ExchangePattern;
+import org.switchyard.ExchangePhase;
 import org.switchyard.HandlerException;
-import org.switchyard.Property;
-import org.switchyard.Scope;
-import org.switchyard.common.camel.ContextPropertyUtil;
-import org.switchyard.common.camel.HandlerDataSource;
-import org.switchyard.common.camel.SwitchYardMessage;
 import org.switchyard.Message;
 import org.switchyard.common.xml.QNameUtil;
+import org.switchyard.component.camel.common.CamelConstants;
 import org.switchyard.deploy.ServiceHandler;
-import org.switchyard.exception.SwitchYardException;
-import org.switchyard.label.BehaviorLabel;
+import org.switchyard.SwitchYardException;
 import org.switchyard.metadata.ServiceOperation;
 
 /**
@@ -59,6 +47,21 @@ import org.switchyard.metadata.ServiceOperation;
 public class SwitchYardConsumer extends DefaultConsumer implements ServiceHandler {
 
     private AtomicReference<State> _state = new AtomicReference<State>(State.NONE);
+    
+    private QName _componentName;
+    private String _namespace;
+    
+    /**
+     * Used to flag an exchange as originating from a service implementation route.
+     */
+    public static final String IMPLEMENTATION_ROUTE = 
+            "org.switchyard.component.camel.implementation";
+    
+    /**
+     * The name of the service component containing this camel route.
+     */
+    public static final String COMPONENT_NAME = 
+            "org.switchyard.component.camel.componentName";
 
     /**
      * Sole constructor.
@@ -72,30 +75,21 @@ public class SwitchYardConsumer extends DefaultConsumer implements ServiceHandle
 
     @Override
     public void handleMessage(final Exchange switchyardExchange) throws HandlerException {
-        org.apache.camel.Exchange camelExchange = getEndpoint().createExchange(isInOut(switchyardExchange) ? org.apache.camel.ExchangePattern.InOut : org.apache.camel.ExchangePattern.InOnly);
-        DefaultMessage targetMessage = new SwitchYardMessage();
-        targetMessage.setBody(switchyardExchange.getMessage().getContent());
-
-        for (Property property : switchyardExchange.getContext().getProperties()) {
-            if (property.hasLabel(BehaviorLabel.TRANSIENT.label()) || ContextPropertyUtil.isReservedProperty(property.getName(), property.getScope())) {
-                continue;
-            }
-
-            if (Scope.EXCHANGE.equals(property.getScope())) {
-                camelExchange.setProperty(property.getName(), property.getValue());
-            } else {
-                targetMessage.setHeader(property.getName(), property.getValue());
-            }
-        }
-
-        for (String attachementName : switchyardExchange.getMessage().getAttachmentMap().keySet()) {
-            targetMessage.addAttachment(attachementName, new DataHandler(switchyardExchange.getMessage().getAttachment(attachementName)));
-        }
+        org.apache.camel.Exchange camelExchange = getEndpoint().createExchange(
+                isInOut(switchyardExchange) ? org.apache.camel.ExchangePattern.InOut : org.apache.camel.ExchangePattern.InOnly);
+        DefaultMessage targetMessage = ExchangeMapper.mapSwitchYardToCamel(switchyardExchange, camelExchange);
+        
+        // mark this as an exchange for a camel implementation service
+        camelExchange.setProperty(IMPLEMENTATION_ROUTE, true);
+        camelExchange.setProperty(COMPONENT_NAME, _componentName);
+        
+        // set the application namespace property in case producer endpoints are used in the route
+        camelExchange.setProperty(CamelConstants.APPLICATION_NAMESPACE, _namespace);
 
         ServiceOperation operation = switchyardExchange.getContract().getProviderOperation();
-        targetMessage.setHeader(OPERATION_NAME, operation.getName());
-        targetMessage.setHeader(FAULT_TYPE, operation.getFaultType());
-        targetMessage.setHeader(SERVICE_NAME, switchyardExchange.getProvider().getName());
+        camelExchange.setProperty(OPERATION_NAME, operation.getName());
+        camelExchange.setProperty(FAULT_TYPE, operation.getFaultType());
+        camelExchange.setProperty(SERVICE_NAME, switchyardExchange.getProvider().getName());
         camelExchange.setIn(targetMessage);
 
         invokeCamelProcessor(camelExchange);
@@ -172,6 +166,22 @@ public class SwitchYardConsumer extends DefaultConsumer implements ServiceHandle
         }
     }
 
+    /**
+     * Set the service component name for this camel route implementation.
+     * @param componentName service component name
+     */
+    public void setComponentName(QName componentName) {
+        _componentName = componentName;
+    }
+    
+    /**
+     * Set the application namespace for this camel route implementation.
+     * @param namespace namespace URI
+     */
+    public void setNamespace(String namespace) {
+        _namespace = namespace;
+    }
+
     private void invokeCamelProcessor(final org.apache.camel.Exchange camelExchange) throws HandlerException {
         try {
             getProcessor().process(camelExchange);
@@ -180,34 +190,9 @@ public class SwitchYardConsumer extends DefaultConsumer implements ServiceHandle
         }
     }
 
-    private void sendResponse(org.apache.camel.Exchange camelExchange, final Exchange switchyardExchange) throws HandlerException {
-        final org.apache.camel.Message camelMessage;
-        if (camelExchange.hasOut()) {
-            camelMessage = camelExchange.getOut();
-        } else {
-            camelMessage = camelExchange.getIn();
-        }
-
-        org.switchyard.Message message = switchyardExchange.createMessage();
-        message.setContent(camelMessage.getBody());
-
-        for (String property : camelExchange.getProperties().keySet()) {
-            if (ContextPropertyUtil.isReservedProperty(property, Scope.EXCHANGE)) {
-                continue;
-            }
-            message.getContext().setProperty(property, camelExchange.getProperty(property), Scope.EXCHANGE);
-        }
-        for (String header : camelMessage.getHeaders().keySet()) {
-            if (ContextPropertyUtil.isReservedProperty(header, Scope.MESSAGE)) {
-                continue;
-            }
-            message.getContext().setProperty(header, camelMessage.getHeader(header), Scope.MESSAGE);
-        }
-
-        for (String attachementName : camelMessage.getAttachmentNames()) {
-            message.addAttachment(attachementName, new HandlerDataSource(camelMessage.getAttachment(attachementName)));
-        }
-
+    private void sendResponse(org.apache.camel.Exchange camelExchange, final Exchange switchyardExchange) throws HandlerException {     
+        Message message = ExchangeMapper.mapCamelToSwitchYard(
+                camelExchange, switchyardExchange, ExchangePhase.OUT);
         switchyardExchange.send(message);
     }
 

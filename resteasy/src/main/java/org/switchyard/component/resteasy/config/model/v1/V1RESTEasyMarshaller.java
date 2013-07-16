@@ -1,25 +1,20 @@
 /*
- * JBoss, Home of Professional Open Source
- * Copyright 2012 Red Hat Inc. and/or its affiliates and other contributors
- * as indicated by the @authors tag. All rights reserved.
- * See the copyright.txt in the distribution for a
- * full listing of individual contributors.
+ * Copyright 2013 Red Hat Inc. and/or its affiliates and other contributors.
  *
- * This copyrighted material is made available to anyone wishing to use,
- * modify, copy, or redistribute it subject to the terms and conditions
- * of the GNU Lesser General Public License, v. 2.1.
- * This program is distributed in the hope that it will be useful, but WITHOUT A
- * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
- * PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more details.
- * You should have received a copy of the GNU Lesser General Public License,
- * v.2.1 along with this distribution; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- * MA  02110-1301, USA.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,  
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.switchyard.component.resteasy.config.model.v1;
 
-import org.switchyard.component.resteasy.config.model.RESTEasyBindingModel;
+import org.switchyard.component.resteasy.config.model.RESTEasyNameValueModel.RESTEasyName;
 import org.switchyard.config.Configuration;
 import org.switchyard.config.model.BaseMarshaller;
 import org.switchyard.config.model.Descriptor;
@@ -54,15 +49,26 @@ public class V1RESTEasyMarshaller extends BaseMarshaller {
      */
     @Override
     public Model read(Configuration config) {
+        Descriptor desc = getDescriptor();
         String name = config.getName();
         if (name.startsWith(BindingModel.BINDING)) {
-            return new RESTEasyBindingModel(config, getDescriptor());
-        }
-        if (name.equals(ContextMapperModel.CONTEXT_MAPPER)) {
-            return new V1ContextMapperModel(config, getDescriptor());
-        }
-        if (name.equals(MessageComposerModel.MESSAGE_COMPOSER)) {
-            return new V1MessageComposerModel(config, getDescriptor());
+            return new V1RESTEasyBindingModel(config, desc);
+        } else if (name.equals(ContextMapperModel.CONTEXT_MAPPER)) {
+            return new V1ContextMapperModel(config, desc);
+        } else if (name.equals(MessageComposerModel.MESSAGE_COMPOSER)) {
+            return new V1MessageComposerModel(config, desc);
+        } else if (name.equals(RESTEasyName.basic.name())) {
+            return new V1BasicAuthModel(config, desc);
+        } else if (name.equals(RESTEasyName.ntlm.name())) {
+            return new V1NtlmAuthModel(config, desc);
+        } else if (name.equals(RESTEasyName.proxy.name())) {
+            return new V1ProxyModel(config, desc);
+        } else {
+            for (RESTEasyName n : RESTEasyName.values()) {
+                if (n.name().equals(name)) {
+                    return new V1RESTEasyNameValueModel(config, desc);
+                }
+            }
         }
         return null;
     }

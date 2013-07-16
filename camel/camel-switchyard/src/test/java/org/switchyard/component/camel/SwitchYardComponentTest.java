@@ -1,22 +1,15 @@
 /*
- * JBoss, Home of Professional Open Source Copyright 2009, Red Hat Middleware
- * LLC, and individual contributors by the @authors tag. See the copyright.txt
- * in the distribution for a full listing of individual contributors.
- * 
- * This is free software; you can redistribute it and/or modify it under the
- * terms of the GNU Lesser General Public License as published by the Free
- * Software Foundation; either version 2.1 of the License, or (at your option)
- * any later version.
- * 
- * This software is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
- * FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more
- * details.
- * 
- * You should have received a copy of the GNU Lesser General Public License
- * along with this software; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA, or see the FSF
- * site: http://www.fsf.org.
+ * Copyright 2013 Red Hat Inc. and/or its affiliates and other contributors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,  
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package org.switchyard.component.camel;
 
@@ -41,6 +34,7 @@ import org.switchyard.component.test.mixins.cdi.CDIMixIn;
 import org.switchyard.deploy.Binding;
 import org.switchyard.metadata.InOnlyService;
 import org.switchyard.metadata.InOutService;
+import org.switchyard.metadata.ServiceMetadataBuilder;
 import org.switchyard.policy.Policy;
 import org.switchyard.policy.PolicyUtil;
 import org.switchyard.policy.SecurityPolicy;
@@ -109,7 +103,12 @@ public class SwitchYardComponentTest extends SwitchYardComponentTestBase {
     public void customBindingData() throws Exception {
         List<Policy> policies = Arrays.<Policy>asList(SecurityPolicy.CONFIDENTIALITY);
         final MockHandler mockService = new MockHandler();
-        _serviceDomain.registerService(new QName(_serviceName), new InOnlyService(), mockService, policies, null, new Binding(null));
+        _serviceDomain.registerService(
+                new QName(_serviceName),
+                new InOnlyService(),
+                mockService,
+                ServiceMetadataBuilder.create().security(_serviceDomain.getServiceSecurity(null))
+                        .requiredPolicies(policies).registrant(new Binding(null)).build());
         _serviceDomain.registerServiceReference(new QName(_serviceName), new InOnlyService("process"));
         _camelContext.addRoutes(new RouteBuilder() {
             @Override

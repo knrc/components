@@ -1,20 +1,15 @@
-/* 
- * JBoss, Home of Professional Open Source 
- * Copyright 2013 Red Hat Inc. and/or its affiliates and other contributors
- * as indicated by the @author tags. All rights reserved. 
- * See the copyright.txt in the distribution for a 
- * full listing of individual contributors.
+/*
+ * Copyright 2013 Red Hat Inc. and/or its affiliates and other contributors.
  *
- * This copyrighted material is made available to anyone wishing to use, 
- * modify, copy, or redistribute it subject to the terms and conditions 
- * of the GNU Lesser General Public License, v. 2.1. 
- * This program is distributed in the hope that it will be useful, but WITHOUT A 
- * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A 
- * PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more details. 
- * You should have received a copy of the GNU Lesser General Public License, 
- * v.2.1 along with this distribution; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, 
- * MA  02110-1301, USA.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,  
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package org.switchyard.component.soap.config.model.v1;
 
@@ -28,7 +23,10 @@ import org.switchyard.common.net.SocketAddr;
 import org.switchyard.component.soap.PortName;
 import org.switchyard.component.soap.config.model.EndpointConfigModel;
 import org.switchyard.component.soap.config.model.InterceptorsModel;
+import org.switchyard.component.soap.config.model.BasicAuthModel;
 import org.switchyard.component.soap.config.model.MtomModel;
+import org.switchyard.component.soap.config.model.NtlmAuthModel;
+import org.switchyard.component.soap.config.model.ProxyModel;
 import org.switchyard.component.soap.config.model.SOAPBindingModel;
 import org.switchyard.component.soap.config.model.SOAPContextMapperModel;
 import org.switchyard.component.soap.config.model.SOAPMessageComposerModel;
@@ -43,6 +41,7 @@ import org.switchyard.config.model.composite.v1.V1BindingModel;
  * The 1st version SOAPBindingModel.
  *
  * @author David Ward &lt;<a href="mailto:dward@jboss.org">dward@jboss.org</a>&gt; &copy; 2013 Red Hat Inc.
+ * @author Magesh Kumar B <mageshbk@jboss.com> (C) 2013 Red Hat Inc.
  */
 public class V1SOAPBindingModel extends V1BindingModel implements SOAPBindingModel {
 
@@ -52,6 +51,9 @@ public class V1SOAPBindingModel extends V1BindingModel implements SOAPBindingMod
         SOAPName.socketAddr.name(),
         SOAPName.contextPath.name(),
         SOAPName.endpointAddress.name(),
+        SOAPName.basic.name(),
+        SOAPName.ntlm.name(),
+        SOAPName.proxy.name(),
         ENDPOINT_CONFIG,
         SOAPName.mtom.name(),
         IN_INTERCEPTORS,
@@ -66,6 +68,9 @@ public class V1SOAPBindingModel extends V1BindingModel implements SOAPBindingMod
     private SocketAddr _socketAddr;
     private SOAPNameValueModel _contextPath;
     private SOAPNameValueModel _endpointAddress;
+    private BasicAuthModel _basicAuth;
+    private NtlmAuthModel _ntlmAuth;
+    private ProxyModel _proxyConfig;
     private MtomModel _mtomConfig;
     private EndpointConfigModel _endpointConfig;
     private InterceptorsModel _inInterceptors;
@@ -264,6 +269,79 @@ public class V1SOAPBindingModel extends V1BindingModel implements SOAPBindingMod
     @Override
     public SOAPBindingModel setEndpointAddress(String endpointAddress) {
         _endpointAddress = setNameValue(_endpointAddress, SOAPName.endpointAddress, endpointAddress);
+        return this;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public BasicAuthModel getBasicAuthConfig() {
+        if (_basicAuth == null) {
+            _basicAuth = (BasicAuthModel)getFirstChildModel(SOAPName.basic.name());
+        }
+        return _basicAuth;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public SOAPBindingModel setBasicAuthConfig(BasicAuthModel config) {
+        setChildModel(config);
+        _basicAuth = config;
+        return this;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public NtlmAuthModel getNtlmAuthConfig() {
+        if (_ntlmAuth == null) {
+            _ntlmAuth = (NtlmAuthModel)getFirstChildModel(SOAPName.ntlm.name());
+        }
+        return _ntlmAuth;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public SOAPBindingModel setNtlmAuthConfig(NtlmAuthModel config) {
+        setChildModel(config);
+        _ntlmAuth = config;
+        return this;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Boolean isBasicAuth() {
+        return (getBasicAuthConfig() != null) ? true : false;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Boolean hasAuthentication() {
+        return ((getBasicAuthConfig() != null) || (getNtlmAuthConfig() != null)) ? true : false;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public ProxyModel getProxyConfig() {
+        if (_proxyConfig == null) {
+            _proxyConfig = (ProxyModel)getFirstChildModel(SOAPName.proxy.name());
+        }
+        return _proxyConfig;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public SOAPBindingModel setProxyConfig(ProxyModel proxyConfig) {
+        setChildModel(proxyConfig);
+        _proxyConfig = proxyConfig;
         return this;
     }
 
