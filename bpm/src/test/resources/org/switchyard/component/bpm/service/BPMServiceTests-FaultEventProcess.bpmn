@@ -1,78 +1,95 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:g="http://www.jboss.org/drools/flow/gpd" xmlns:tns="http://www.jboss.org/drools" xsi:schemaLocation="http://www.omg.org/spec/BPMN/20100524/MODEL BPMN20.xsd" id="Definition" expressionLanguage="http://www.mvel.org/2.0" targetNamespace="http://www.jboss.org/drools" typeLanguage="http://www.java.com/javaTypes">
-  <itemDefinition id="ItemDefinition_HandlerException" structureRef="org.switchyard.HandlerException"/>
-  <process id="FaultEventProcess" tns:packageName="org.switchyard.component.bpm" name="FaultEventProcess" isExecutable="true" processType="Private">
-    <extensionElements/>
-    <property id="faultEvent" itemSubjectRef="ItemDefinition_HandlerException"/>
-    <startEvent id="_1" name="StartProcess">
-      <outgoing>_1-_4</outgoing>
-    </startEvent>
-    <endEvent id="_3" name="EndProcess">
-      <incoming>SequenceFlow_4</incoming>
-      <terminateEventDefinition id="TerminateEventDefinition_1"/>
-    </endEvent>
-    <task id="_4" tns:taskName="SwitchYard Service Task" name="TestService">
-      <incoming>_1-_4</incoming>
-      <outgoing>SequenceFlow_8</outgoing>
-      <ioSpecification id="InputOutputSpecification_1">
-        <dataInput id="DataInput_ServiceName" name="ServiceName"/>
-        <dataInput id="DataInput_1" name="FaultEventId"/>
-        <inputSet id="InputSet_1">
-          <dataInputRefs>DataInput_ServiceName</dataInputRefs>
-          <dataInputRefs>DataInput_1</dataInputRefs>
-        </inputSet>
-        <outputSet id="OutputSet_1"/>
-      </ioSpecification>
-      <dataInputAssociation id="DataInputAssociation_1">
-        <targetRef>DataInput_ServiceName</targetRef>
-        <assignment id="Assignment_1">
-          <from xsi:type="tFormalExpression" id="FormalExpression_1">TestService</from>
-          <to xsi:type="tFormalExpression" id="FormalExpression_2">DataInput_ServiceName</to>
-        </assignment>
-      </dataInputAssociation>
-      <dataInputAssociation id="DataInputAssociation_3">
-        <targetRef>DataInput_1</targetRef>
-        <assignment id="Assignment_3">
-          <from xsi:type="tFormalExpression" id="FormalExpression_4">FaultSignal</from>
-          <to xsi:type="tFormalExpression" id="FormalExpression_3">DataInput_1</to>
-        </assignment>
-      </dataInputAssociation>
-    </task>
-    <sequenceFlow id="_1-_4" sourceRef="_1" targetRef="_4"/>
-    <intermediateCatchEvent id="IntermediateCatchEvent_1" name="FaultEvent">
-      <outgoing>SequenceFlow_5</outgoing>
-      <dataOutput id="DataOutput_FaultEvent" itemSubjectRef="ItemDefinition_HandlerException" name="faultEvent"/>
-      <dataOutputAssociation id="DataOutputAssociation_2">
-        <sourceRef>DataOutput_FaultEvent</sourceRef>
-        <targetRef>faultEvent</targetRef>
-      </dataOutputAssociation>
-      <outputSet id="OutputSet_3">
-        <dataOutputRefs>DataOutput_FaultEvent</dataOutputRefs>
-      </outputSet>
-      <signalEventDefinition id="SignalEventDefinition_FaultSignal" signalRef="FaultSignal"/>
-    </intermediateCatchEvent>
-    <scriptTask id="FaultScript" name="FaultEventScript" scriptFormat="http://www.java.com/java">
-      <incoming>SequenceFlow_5</incoming>
-      <outgoing>SequenceFlow_12</outgoing>
-      <script>System.out.println(&quot;********** FaultEventProcess/TestFailureScript: &quot; + faultEvent + &quot; **********&quot;);</script>
-    </scriptTask>
-    <sequenceFlow id="SequenceFlow_5" tns:priority="1" name="" sourceRef="IntermediateCatchEvent_1" targetRef="FaultScript"/>
-    <scriptTask id="ScriptTask_1" name="SuccessScript" scriptFormat="http://www.java.com/java">
-      <incoming>SequenceFlow_8</incoming>
-      <outgoing>SequenceFlow_6</outgoing>
-      <script>System.out.println(&quot;********** FaultEventProcess/TestSuccessScript **********&quot;);</script>
-    </scriptTask>
-    <exclusiveGateway id="ExclusiveGateway_2" name="" gatewayDirection="Converging">
-      <incoming>SequenceFlow_6</incoming>
-      <incoming>SequenceFlow_12</incoming>
-      <outgoing>SequenceFlow_4</outgoing>
-    </exclusiveGateway>
-    <sequenceFlow id="SequenceFlow_4" tns:priority="1" name="" sourceRef="ExclusiveGateway_2" targetRef="_3"/>
-    <sequenceFlow id="SequenceFlow_6" tns:priority="1" name="" sourceRef="ScriptTask_1" targetRef="ExclusiveGateway_2"/>
-    <sequenceFlow id="SequenceFlow_12" tns:priority="1" name="" sourceRef="FaultScript" targetRef="ExclusiveGateway_2"/>
-    <sequenceFlow id="SequenceFlow_8" tns:priority="1" name="" sourceRef="_4" targetRef="ScriptTask_1"/>
-  </process>
-  <signal id="FaultSignal" name="FaultSignal"/>
+<bpmn2:definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bpmn2="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:g="http://www.jboss.org/drools/flow/gpd" xmlns:tns="http://www.jboss.org/drools" xmlns="http://www.jboss.org/drools" xsi:schemaLocation="http://www.omg.org/spec/BPMN/20100524/MODEL BPMN20.xsd http://www.jboss.org/drools drools.xsd http://www.bpsim.org/schemas/1.0 bpsim.xsd" id="Definition" expressionLanguage="http://www.mvel.org/2.0" targetNamespace="http://www.jboss.org/drools" typeLanguage="http://www.java.com/javaTypes">
+  <bpmn2:itemDefinition id="ItemDefinition_HandlerException" structureRef="org.switchyard.HandlerException"/>
+  <bpmn2:signal id="FaultSignal" name="FaultSignal"/>
+  <bpmn2:process id="FaultEventProcess" tns:version="1" tns:packageName="org.switchyard.component.bpm" tns:adHoc="false" name="FaultEventProcess" isExecutable="true" processType="Private">
+    <bpmn2:extensionElements/>
+    <bpmn2:property id="faultEvent" itemSubjectRef="ItemDefinition_HandlerException"/>
+    <bpmn2:startEvent id="_1" name="StartProcess">
+      <bpmn2:outgoing>_1-_4</bpmn2:outgoing>
+    </bpmn2:startEvent>
+    <bpmn2:endEvent id="_3" name="EndProcess">
+      <bpmn2:incoming>SequenceFlow_4</bpmn2:incoming>
+      <bpmn2:terminateEventDefinition id="TerminateEventDefinition_1"/>
+    </bpmn2:endEvent>
+    <bpmn2:task id="_4" tns:taskName="SwitchYard Service Task" name="TestService">
+      <bpmn2:extensionElements>
+        <tns:onEntry-script scriptFormat="http://www.java.com/java">
+          <tns:script></tns:script>
+        </tns:onEntry-script>
+        <tns:onExit-script scriptFormat="http://www.java.com/java">
+          <tns:script></tns:script>
+        </tns:onExit-script>
+      </bpmn2:extensionElements>
+      <bpmn2:incoming>_1-_4</bpmn2:incoming>
+      <bpmn2:outgoing>SequenceFlow_8</bpmn2:outgoing>
+      <bpmn2:ioSpecification id="InputOutputSpecification_1">
+        <bpmn2:dataInput id="DataInput_ServiceName" name="ServiceName"/>
+        <bpmn2:dataInput id="DataInput_1" name="FaultEventId"/>
+        <bpmn2:dataInput id="DataInput_6" name="FaultAction"/>
+        <bpmn2:inputSet id="InputSet_1">
+          <bpmn2:dataInputRefs>DataInput_ServiceName</bpmn2:dataInputRefs>
+          <bpmn2:dataInputRefs>DataInput_1</bpmn2:dataInputRefs>
+          <bpmn2:dataInputRefs>DataInput_6</bpmn2:dataInputRefs>
+        </bpmn2:inputSet>
+        <bpmn2:outputSet id="OutputSet_1"/>
+      </bpmn2:ioSpecification>
+      <bpmn2:dataInputAssociation id="DataInputAssociation_1">
+        <bpmn2:targetRef>DataInput_ServiceName</bpmn2:targetRef>
+        <bpmn2:assignment id="Assignment_1">
+          <bpmn2:from xsi:type="bpmn2:tFormalExpression" id="FormalExpression_1">TestService</bpmn2:from>
+          <bpmn2:to xsi:type="bpmn2:tFormalExpression" id="FormalExpression_2">DataInput_ServiceName</bpmn2:to>
+        </bpmn2:assignment>
+      </bpmn2:dataInputAssociation>
+      <bpmn2:dataInputAssociation id="DataInputAssociation_3">
+        <bpmn2:targetRef>DataInput_1</bpmn2:targetRef>
+        <bpmn2:assignment id="Assignment_3">
+          <bpmn2:from xsi:type="bpmn2:tFormalExpression" id="FormalExpression_4">FaultSignal</bpmn2:from>
+          <bpmn2:to xsi:type="bpmn2:tFormalExpression" id="FormalExpression_3">DataInput_1</bpmn2:to>
+        </bpmn2:assignment>
+      </bpmn2:dataInputAssociation>
+      <bpmn2:dataInputAssociation id="DataInputAssociation_7">
+        <bpmn2:targetRef>DataInput_6</bpmn2:targetRef>
+        <bpmn2:assignment id="Assignment_7">
+          <bpmn2:from xsi:type="bpmn2:tFormalExpression" id="FormalExpression_14" language="http://www.mvel.org/2.0">SKIP</bpmn2:from>
+          <bpmn2:to xsi:type="bpmn2:tFormalExpression" id="FormalExpression_13" language="http://www.mvel.org/2.0">DataInput_6</bpmn2:to>
+        </bpmn2:assignment>
+      </bpmn2:dataInputAssociation>
+    </bpmn2:task>
+    <bpmn2:sequenceFlow id="_1-_4" tns:priority="1" sourceRef="_1" targetRef="_4"/>
+    <bpmn2:intermediateCatchEvent id="IntermediateCatchEvent_1" name="FaultEvent">
+      <bpmn2:outgoing>SequenceFlow_5</bpmn2:outgoing>
+      <bpmn2:dataOutput id="DataOutput_FaultEvent" itemSubjectRef="ItemDefinition_HandlerException" name="faultEvent"/>
+      <bpmn2:dataOutputAssociation id="DataOutputAssociation_2">
+        <bpmn2:sourceRef>DataOutput_FaultEvent</bpmn2:sourceRef>
+        <bpmn2:targetRef>faultEvent</bpmn2:targetRef>
+      </bpmn2:dataOutputAssociation>
+      <bpmn2:outputSet id="OutputSet_3">
+        <bpmn2:dataOutputRefs>DataOutput_FaultEvent</bpmn2:dataOutputRefs>
+      </bpmn2:outputSet>
+      <bpmn2:signalEventDefinition id="SignalEventDefinition_FaultSignal" signalRef="FaultSignal"/>
+    </bpmn2:intermediateCatchEvent>
+    <bpmn2:scriptTask id="FaultScript" name="FaultEventScript" scriptFormat="http://www.java.com/java">
+      <bpmn2:incoming>SequenceFlow_5</bpmn2:incoming>
+      <bpmn2:outgoing>SequenceFlow_12</bpmn2:outgoing>
+      <bpmn2:script>System.out.println(&quot;********** FaultEventProcess/TestFailureScript: &quot; + faultEvent + &quot; **********&quot;);</bpmn2:script>
+    </bpmn2:scriptTask>
+    <bpmn2:sequenceFlow id="SequenceFlow_5" tns:priority="1" name="" sourceRef="IntermediateCatchEvent_1" targetRef="FaultScript"/>
+    <bpmn2:scriptTask id="ScriptTask_1" name="SuccessScript" scriptFormat="http://www.java.com/java">
+      <bpmn2:incoming>SequenceFlow_8</bpmn2:incoming>
+      <bpmn2:outgoing>SequenceFlow_6</bpmn2:outgoing>
+      <bpmn2:script>System.out.println(&quot;********** FaultEventProcess/TestSuccessScript **********&quot;);</bpmn2:script>
+    </bpmn2:scriptTask>
+    <bpmn2:exclusiveGateway id="ExclusiveGateway_2" name="" gatewayDirection="Converging">
+      <bpmn2:incoming>SequenceFlow_6</bpmn2:incoming>
+      <bpmn2:incoming>SequenceFlow_12</bpmn2:incoming>
+      <bpmn2:outgoing>SequenceFlow_4</bpmn2:outgoing>
+    </bpmn2:exclusiveGateway>
+    <bpmn2:sequenceFlow id="SequenceFlow_4" tns:priority="1" name="" sourceRef="ExclusiveGateway_2" targetRef="_3"/>
+    <bpmn2:sequenceFlow id="SequenceFlow_6" tns:priority="1" name="" sourceRef="ScriptTask_1" targetRef="ExclusiveGateway_2"/>
+    <bpmn2:sequenceFlow id="SequenceFlow_12" tns:priority="1" name="" sourceRef="FaultScript" targetRef="ExclusiveGateway_2"/>
+    <bpmn2:sequenceFlow id="SequenceFlow_8" tns:priority="1" name="" sourceRef="_4" targetRef="ScriptTask_1"/>
+  </bpmn2:process>
   <bpmndi:BPMNDiagram id="BPMNDiagram_1" name="FaultEventProcess">
     <bpmndi:BPMNPlane id="BPMNPlane_Process_1" bpmnElement="TestService">
       <bpmndi:BPMNShape id="BPMNShape_StartEvent_1" bpmnElement="_1">
@@ -122,4 +139,4 @@
       </bpmndi:BPMNEdge>
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>
-</definitions>
+</bpmn2:definitions>

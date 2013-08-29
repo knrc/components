@@ -37,7 +37,6 @@ import org.switchyard.HandlerException;
 import org.switchyard.Message;
 import org.switchyard.Service;
 import org.switchyard.ServiceDomain;
-import org.switchyard.ServiceReference;
 import org.switchyard.component.bpm.annotation.BPM;
 import org.switchyard.component.bpm.annotation.SignalEvent;
 import org.switchyard.component.bpm.annotation.SignalEventAll;
@@ -71,6 +70,7 @@ public class BPMServiceTests {
     private static final String CONTROL_PROCESS_BPMN = "org/switchyard/component/bpm/service/BPMServiceTests-ControlProcess.bpmn";
     private static final String FAULT_RESULT_PROCESS_BPMN = "org/switchyard/component/bpm/service/BPMServiceTests-FaultResultProcess.bpmn";
     private static final String FAULT_EVENT_PROCESS_BPMN = "org/switchyard/component/bpm/service/BPMServiceTests-FaultEventProcess.bpmn";
+    private static final String FAULT_BOUNDARY_PROCESS_BPMN = "org/switchyard/component/bpm/service/BPMServiceTests-FaultBoundaryProcess.bpmn";
     private static final String REUSE_HANDLER_BPMN = "org/switchyard/component/bpm/service/BPMServiceTests-ReuseHandler.bpmn";
     private static final String RULES_FIRED_BPMN = "org/switchyard/component/bpm/service/BPMServiceTests-RulesFired.bpmn";
     private static final String RULES_FIRED_DRL = "org/switchyard/component/bpm/service/BPMServiceTests-RulesFired.drl";
@@ -115,15 +115,11 @@ public class BPMServiceTests {
         BPMComponentImplementationModel bci_model = (BPMComponentImplementationModel)new BPMSwitchYardScanner().scan(AccessAttachment.class).getImplementation();
         QName serviceName = new QName("AccessAttachment");
         BPMExchangeHandler handler = new BPMExchangeHandler(bci_model, serviceDomain, serviceName);
-        Service aaService = serviceDomain.registerService(serviceName, JavaService.fromClass(AccessAttachment.class), handler);
-        ServiceReference aaReference = serviceDomain.registerServiceReference(aaService.getName(), aaService.getInterface(), aaService.getProviderHandler());
+        Service service = serviceDomain.registerService(serviceName, JavaService.fromClass(AccessAttachment.class), handler);
+        serviceDomain.registerServiceReference(service.getName(), service.getInterface(), service.getProviderHandler());
         handler.start();
-        Exchange exchange = aaReference.createExchange("process");
-        Message message = exchange.createMessage();
-        message.setContent(holder);
         DataSource attachment = new TestDataSource("someAttach", "text/plain", "someAttachData");
-        message.addAttachment(attachment.getName(), attachment);
-        exchange.send(message);
+        new Invoker(serviceDomain, serviceName).operation("process").attachment(attachment.getName(), attachment).sendInOnly(holder);
         handler.stop();
         Assert.assertEquals("someAttachData", holder.getValue());
     }
@@ -321,6 +317,40 @@ public class BPMServiceTests {
         ksession.dispose();
     }
 
+    @Test
+    public void testFaultBoundaryProcessSuccess() throws Exception {
+        runFaultBoundaryProcess(false);
+    }
+
+    @Test
+    public void testFaultBoundaryProcessFailure() throws Exception {
+        runFaultBoundaryProcess(true);
+    }
+
+    private void runFaultBoundaryProcess(final boolean bomb) throws Exception {
+        serviceDomain.registerService(new QName("TestService"), new InOnlyService(), new BaseHandler(){
+            public void handleMessage(Exchange exchange) throws HandlerException {
+                if (bomb) {
+                    throw new HandlerException("BOOM!");
+                }
+            }
+        });
+        serviceDomain.registerServiceReference(new QName("TestService"), new InOutService());
+        KnowledgeBuilder kbuilder = KnowledgeBuilderFactory.newKnowledgeBuilder();
+        kbuilder.add(ResourceFactory.newClassPathResource(FAULT_BOUNDARY_PROCESS_BPMN), ResourceType.BPMN2);
+        KieBase kbase = kbuilder.newKnowledgeBase();
+        KieSession ksession = kbase.newKieSession();
+        SwitchYardServiceTaskHandler ssth = new SwitchYardServiceTaskHandler();
+        ssth.setProcessRuntime(ksession);
+        ssth.setInvoker(new SwitchYardServiceInvoker(serviceDomain));
+        ksession.getWorkItemManager().registerWorkItemHandler(ssth.getName(), ssth);
+        WorkflowProcessInstance wpi = (WorkflowProcessInstance)ksession.startProcess("FaultBoundaryProcess");
+        String output = (String)wpi.getVariable("TestOutput");
+        Assert.assertEquals(bomb ? "Failure" : "Success", output);
+        ksession.halt();
+        ksession.dispose();
+    }
+
     @BPM(processId="ReuseHandler", manifest=@Manifest(resources=@Resource(location=REUSE_HANDLER_BPMN, type="BPMN2")),
             workItemHandlers=@WorkItemHandler(name="ReuseHandler", value=ReuseHandler.class))
     public interface ReuseHandlerProcess {
@@ -330,14 +360,13 @@ public class BPMServiceTests {
 
     @Test
     public void testReuseHandler() throws Exception {
-        QName serviceName = new QName("ReuseHandler");
-        ServiceReference serviceRef = serviceDomain.registerServiceReference(serviceName, new InOnlyService("process"));
         BPMComponentImplementationModel bci_model = (BPMComponentImplementationModel)new BPMSwitchYardScanner().scan(ReuseHandlerProcess.class).getImplementation();
+        QName serviceName = new QName("ReuseHandler");
         BPMExchangeHandler handler = new BPMExchangeHandler(bci_model, serviceDomain, serviceName);
-        serviceDomain.registerService(serviceName, new InOnlyService("process"), handler);
+        Service service = serviceDomain.registerService(serviceName, new InOnlyService("process"), handler);
+        serviceDomain.registerServiceReference(service.getName(), service.getInterface(), service.getProviderHandler());
         handler.start();
-        Exchange exchange = serviceRef.createExchange();
-        exchange.send(exchange.createMessage());
+        new Invoker(serviceDomain, serviceName).operation("process").sendInOnly(null);
         handler.stop();
         Assert.assertEquals("handler executed", ReuseHandler._holder.getValue());
         ReuseHandler._holder.setValue(null);
@@ -354,16 +383,13 @@ public class BPMServiceTests {
     @Test
     public void testRulesFired() throws Exception {
         final Holder holder = new Holder();
-        QName serviceName = new QName("RulesFired");
-        ServiceReference serviceRef = serviceDomain.registerServiceReference(serviceName, new InOnlyService("process"));
         BPMComponentImplementationModel bci_model = (BPMComponentImplementationModel)new BPMSwitchYardScanner().scan(RulesFiredProcess.class).getImplementation();
+        QName serviceName = new QName("RulesFired");
         BPMExchangeHandler handler = new BPMExchangeHandler(bci_model, serviceDomain, serviceName);
-        serviceDomain.registerService(serviceName, new InOnlyService("process"), handler);
+        Service service = serviceDomain.registerService(serviceName, new InOnlyService("process"), handler);
+        serviceDomain.registerServiceReference(service.getName(), service.getInterface(), service.getProviderHandler());
         handler.start();
-        Exchange exchange = serviceRef.createExchange();
-        Message message = exchange.createMessage();
-        message.setContent(holder);
-        exchange.send(message);
+        new Invoker(serviceDomain, serviceName).operation("process").sendInOnly(holder);
         handler.stop();
         Assert.assertEquals("rules fired", holder.getValue());
     }

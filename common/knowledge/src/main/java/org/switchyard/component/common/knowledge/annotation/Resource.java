@@ -36,4 +36,7 @@ public @interface Resource {
     /** Type. */
     public String type();
 
+    /** Detail. */
+    public ResourceDetail[] detail() default {};
+
 }
